@@ -1,0 +1,101 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
+import { TestimonyStatus, Language } from '../common/enums';
+import { User } from './user.entity';
+import { Admin } from './admin.entity';
+
+@Entity('testimonies')
+@Index(['status'])
+@Index(['isAnonymous'])
+@Index(['submittedAt'])
+@Index(['approvedAt'])
+export class Testimony {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({
+    type: 'uuid',
+    nullable: true,
+    comment: 'ID of the user who submitted the testimony (null if anonymous)',
+  })
+  userId: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    comment: 'Whether this testimony is anonymous',
+  })
+  isAnonymous: boolean;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+    comment: 'Testimony content in French',
+  })
+  contentFr: string;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+    comment: 'Testimony content in English',
+  })
+  contentEn: string;
+
+  @Column({
+    type: 'enum',
+    enum: TestimonyStatus,
+    default: TestimonyStatus.PENDING,
+    comment: 'Status of the testimony',
+  })
+  status: TestimonyStatus;
+
+  @Column({
+    type: 'enum',
+    enum: Language,
+    comment: 'Language in which the testimony was submitted',
+  })
+  language: Language;
+
+  @Column({
+    type: 'timestamptz',
+    default: () => 'CURRENT_TIMESTAMP',
+    comment: 'When the testimony was submitted',
+  })
+  submittedAt: Date;
+
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+    comment: 'When the testimony was approved',
+  })
+  approvedAt: Date;
+
+  @Column({
+    type: 'uuid',
+    nullable: true,
+    comment: 'ID of the admin who approved this testimony',
+  })
+  approvedById: string;
+
+  @ManyToOne(() => Admin, { nullable: true })
+  @JoinColumn({ name: 'approvedById' })
+  approvedBy: Admin;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt: Date;
+}
