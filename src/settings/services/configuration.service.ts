@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppSettings } from '../../entities/app-settings.entity';
@@ -11,9 +11,11 @@ import * as crypto from 'crypto';
  */
 @Injectable()
 export class ConfigurationService implements OnModuleInit {
+  private readonly logger = new Logger(ConfigurationService.name);
   private cache: Map<string, any> = new Map();
   private readonly ENCRYPTION_KEY: string;
   private readonly ENCRYPTION_ALGORITHM = 'aes-256-cbc';
+  private readonly REQUIRED_KEY_LENGTH = 32; // AES-256 requires 32 bytes
 
   constructor(
     @InjectRepository(AppSettings)
@@ -22,7 +24,25 @@ export class ConfigurationService implements OnModuleInit {
     // Get encryption key from environment variables
     this.ENCRYPTION_KEY =
       process.env.SETTINGS_ENCRYPTION_KEY ||
-      'default-key-change-in-production-32-chars!!'; // Must be 32 characters
+      'dev-encryption-key-32-chars!!'; // Default for development only
+
+    // Validate encryption key length
+    this.validateEncryptionKey();
+  }
+
+  /**
+   * Validate that the encryption key has the correct length
+   */
+  private validateEncryptionKey(): void {
+    if (this.ENCRYPTION_KEY.length !== this.REQUIRED_KEY_LENGTH) {
+      const errorMessage = `SETTINGS_ENCRYPTION_KEY must be exactly ${this.REQUIRED_KEY_LENGTH} characters long. Current length: ${this.ENCRYPTION_KEY.length}. Please update your .env file with a valid encryption key.`;
+      this.logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    if (process.env.NODE_ENV === 'production' && this.ENCRYPTION_KEY === 'dev-encryption-key-32-chars!!') {
+      this.logger.warn('⚠️  WARNING: Using default encryption key in production! Please set SETTINGS_ENCRYPTION_KEY in your .env file.');
+    }
   }
 
   /**
@@ -205,21 +225,28 @@ export class ConfigurationService implements OnModuleInit {
    * @param data - Data to encrypt
    */
   private encrypt(data: Record<string, any>): Record<string, any> {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(
-      this.ENCRYPTION_ALGORITHM,
-      Buffer.from(this.ENCRYPTION_KEY),
-      iv,
-    );
+    try {
+      const iv = crypto.randomBytes(16);
+      const cipher = crypto.createCipheriv(
+        this.ENCRYPTION_ALGORITHM,
+        Buffer.from(this.ENCRYPTION_KEY),
+        iv,
+      );
 
-    const jsonString = JSON.stringify(data);
-    let encrypted = cipher.update(jsonString, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
+      const jsonString = JSON.stringify(data);
+      let encrypted = cipher.update(jsonString, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
 
-    return {
-      encrypted: encrypted,
-      iv: iv.toString('hex'),
-    };
+      return {
+        encrypted: encrypted,
+        iv: iv.toString('hex'),
+      };
+    } catch (error) {
+      this.logger.error('Encryption error:', error);
+      throw new BadRequestException(
+        `Impossible de chiffrer les données. Vérifiez que SETTINGS_ENCRYPTION_KEY fait exactement ${this.REQUIRED_KEY_LENGTH} caractères dans votre fichier .env.`
+      );
+    }
   }
 
   /**
@@ -232,15 +259,22 @@ export class ConfigurationService implements OnModuleInit {
       return encryptedData;
     }
 
-    const decipher = crypto.createDecipheriv(
-      this.ENCRYPTION_ALGORITHM,
-      Buffer.from(this.ENCRYPTION_KEY),
-      Buffer.from(encryptedData.iv, 'hex'),
-    );
+    try {
+      const decipher = crypto.createDecipheriv(
+        this.ENCRYPTION_ALGORITHM,
+        Buffer.from(this.ENCRYPTION_KEY),
+        Buffer.from(encryptedData.iv, 'hex'),
+      );
 
-    let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
+      let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
 
-    return JSON.parse(decrypted);
+      return JSON.parse(decrypted);
+    } catch (error) {
+      this.logger.error('Decryption error:', error);
+      throw new BadRequestException(
+        `Impossible de déchiffrer les données. La clé de chiffrement (SETTINGS_ENCRYPTION_KEY) a peut-être changé ou est invalide.`
+      );
+    }
   }
 }

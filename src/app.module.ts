@@ -7,6 +7,7 @@ import envConfig from './config/env.config';
 import { typeOrmAsyncConfig } from './config/typeorm.config';
 import { AdminsModule } from './admins/admins.module';
 import { AuthAdminModule } from './auth-admin/auth-admin.module';
+import { AuthUserModule } from './auth-user/auth-user.module';
 import { DatabaseModule } from './database/database.module';
 import { SettingsModule } from './settings/settings.module';
 import { EventsModule } from './events/events.module';
@@ -17,6 +18,9 @@ import { WithdrawalsModule } from './withdrawals/withdrawals.module';
 import { PrayersModule } from './prayers/prayers.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { NotificationTemplatesModule } from './notification-templates/notification-templates.module';
+import { DashboardStatsModule } from './dashboard-stats/dashboard-stats.module';
+import { UsersModule } from './users/users.module';
+import { CentersModule } from './centers/centers.module';
 
 @Module({
   imports: [
@@ -37,6 +41,8 @@ import { NotificationTemplatesModule } from './notification-templates/notificati
     // Feature Modules
     AdminsModule,
     AuthAdminModule,
+    AuthUserModule,
+    UsersModule, // Module Users pour mobile app
     SettingsModule,
     EventsModule,
     TestimoniesModule,
@@ -44,8 +50,10 @@ import { NotificationTemplatesModule } from './notification-templates/notificati
     DonationsModule,
     WithdrawalsModule,
     PrayersModule,
+    CentersModule, // Module Centers pour admin & mobile app
     NotificationsModule,
     NotificationTemplatesModule,
+    DashboardStatsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

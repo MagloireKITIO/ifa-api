@@ -5,3 +5,4 @@ export * from './i18n-settings.dto';
 export * from './security-settings.dto';
 export * from './general-settings.dto';
 export * from './update-setting.dto';
+export * from './public-settings-response.dto';

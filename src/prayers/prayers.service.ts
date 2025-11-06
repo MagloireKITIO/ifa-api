@@ -3,20 +3,29 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Prayer } from '../entities/prayer.entity';
 import { PrayerReaction } from '../entities/prayer-reaction.entity';
 import { AdminActivityLog } from '../entities/admin-activity-log.entity';
-import { QueryPrayersDto, AddTestimonyDto, ReactPrayerDto } from './dto';
+import {
+  QueryPrayersDto,
+  AddTestimonyDto,
+  ReactPrayerDto,
+  CreatePrayerDto,
+} from './dto';
 import { PrayerStatus, PrayerReactionType } from '../common/enums';
+import { NotificationsService } from '../notifications/services/notifications.service';
 
 /**
  * Service for managing prayers with reactions and testimonies
  */
 @Injectable()
 export class PrayersService {
+  private readonly logger = new Logger(PrayersService.name);
+
   constructor(
     @InjectRepository(Prayer)
     private readonly prayerRepository: Repository<Prayer>,
@@ -24,6 +33,7 @@ export class PrayersService {
     private readonly reactionRepository: Repository<PrayerReaction>,
     @InjectRepository(AdminActivityLog)
     private readonly activityLogRepository: Repository<AdminActivityLog>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -184,8 +194,19 @@ export class PrayersService {
     }
     await this.prayerRepository.save(prayer);
 
-    // TODO: Send notification to prayer author
-    // This will be implemented when notification module is ready
+    // Send notification to prayer author
+    try {
+      const reactionType = reactDto.type === PrayerReactionType.PRAYED ? 'prayed' : 'fasted';
+      await this.notificationsService.createPrayerReactionNotification(
+        prayer.userId,
+        prayerId,
+        reactionType,
+      );
+      this.logger.log(`Notification sent for prayer reaction: ${prayerId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send notification for prayer ${prayerId}:`, error);
+      // Don't fail the reaction if notification fails
+    }
 
     return {
       message: 'Reaction added successfully',
@@ -258,8 +279,37 @@ export class PrayersService {
 
     const updated = await this.prayerRepository.save(prayer);
 
-    // TODO: Send notification to those who reacted
-    // This will be implemented when notification module is ready
+    // Send notification to all users who reacted to this prayer
+    try {
+      // Get all unique user IDs who reacted to this prayer
+      const reactions = await this.reactionRepository.find({
+        where: { prayerId },
+        relations: ['user'],
+      });
+
+      // Get unique user IDs (exclude the prayer author)
+      const userIds = [...new Set(
+        reactions
+          .map((r) => r.userId)
+          .filter((id) => id !== userId), // Exclude prayer author
+      )];
+
+      if (userIds.length > 0) {
+        // Determine prayer author name (respect anonymity)
+        const authorName = prayer.isAnonymous ? 'Anonyme' : (prayer.user?.displayName || 'Un frère/une sœur');
+
+        await this.notificationsService.createPrayerTestimonyNotification(
+          userIds,
+          prayerId,
+          authorName,
+        );
+
+        this.logger.log(`Sent testimony notification to ${userIds.length} user(s) for prayer: ${prayerId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send testimony notification for prayer ${prayerId}:`, error);
+      // Don't fail the testimony if notification fails
+    }
 
     return updated;
   }
@@ -344,6 +394,124 @@ export class PrayersService {
   ): Promise<PrayerReaction | null> {
     return this.reactionRepository.findOne({
       where: { prayerId, userId },
+    });
+  }
+
+  /**
+   * ============================================
+   * PUBLIC & USER ENDPOINTS FOR MOBILE APP
+   * ============================================
+   */
+
+  /**
+   * Get all public prayers with pagination (PUBLIC)
+   * GET /prayers/public
+   *
+   * LOGIQUE :
+   * - Accessible sans authentification
+   * - Retourne uniquement les prières actives par défaut
+   * - Cache les infos user si isAnonymous = true
+   */
+  async findAllPublic(
+    page: number = 1,
+    limit: number = 20,
+    status?: PrayerStatus,
+  ): Promise<{
+    data: Prayer[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const query = this.prayerRepository
+      .createQueryBuilder('prayer')
+      .leftJoinAndSelect('prayer.user', 'user');
+
+    // Filter by status (default to ACTIVE)
+    if (status) {
+      query.andWhere('prayer.status = :status', { status });
+    } else {
+      query.andWhere('prayer.status = :status', { status: PrayerStatus.ACTIVE });
+    }
+
+    // Order by creation date (most recent first)
+    query.orderBy('prayer.createdAt', 'DESC');
+
+    // Pagination
+    const skip = (page - 1) * limit;
+    query.skip(skip).take(limit);
+
+    const [data, total] = await query.getManyAndCount();
+    const totalPages = Math.ceil(total / limit);
+
+    // Hide user info for anonymous prayers
+    const prayers = data.map((prayer) => {
+      if (prayer.isAnonymous) {
+        (prayer as any).user = undefined;
+      }
+      return prayer;
+    });
+
+    return {
+      data: prayers,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  }
+
+  /**
+   * Get a single public prayer by ID (PUBLIC)
+   * GET /prayers/public/:id
+   */
+  async findOnePublic(id: string): Promise<Prayer> {
+    return this.findOne(id); // Utilise la méthode existante
+  }
+
+  /**
+   * Create a new prayer (USER AUTH)
+   * POST /prayers
+   *
+   * LOGIQUE :
+   * - L'utilisateur doit être authentifié
+   * - Créé avec status ACTIVE par défaut
+   * - Compteurs initialisés à 0
+   */
+  async create(userId: string, createPrayerDto: CreatePrayerDto): Promise<any> {
+    // Validate: at least one content field must be provided
+    if (!createPrayerDto.contentFr && !createPrayerDto.contentEn) {
+      throw new BadRequestException(
+        'At least one content field (contentFr or contentEn) must be provided',
+      );
+    }
+
+    const prayer = this.prayerRepository.create({
+      userId,
+      contentFr: createPrayerDto.contentFr || null,
+      contentEn: createPrayerDto.contentEn || null,
+      isAnonymous: createPrayerDto.isAnonymous,
+      language: createPrayerDto.language,
+      status: PrayerStatus.ACTIVE,
+      prayedCount: 0,
+      fastedCount: 0,
+    } as any);
+
+    return await this.prayerRepository.save(prayer);
+  }
+
+  /**
+   * Get my prayers (USER AUTH)
+   * GET /prayers/my-prayers
+   *
+   * LOGIQUE :
+   * - Retourne toutes les prières de l'utilisateur connecté
+   * - Triées par date de création (plus récentes d'abord)
+   */
+  async findMyPrayers(userId: string): Promise<Prayer[]> {
+    return this.prayerRepository.find({
+      where: { userId },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
     });
   }
 

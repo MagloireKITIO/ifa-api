@@ -5,6 +5,7 @@ import { AppSettings } from '../../entities/app-settings.entity';
 import { AdminActivityLog } from '../../entities/admin-activity-log.entity';
 import { AppSettingsCategory } from '../../common/enums';
 import { ConfigurationService } from './configuration.service';
+import { PublicSettingsResponseDto } from '../dto';
 
 /**
  * Service for managing application settings with activity logging
@@ -18,6 +19,49 @@ export class SettingsService {
     private readonly activityLogRepository: Repository<AdminActivityLog>,
     private readonly configurationService: ConfigurationService,
   ) {}
+
+  /**
+   * Get public settings for mobile app
+   * Returns only non-encrypted settings
+   */
+  async getPublicSettings(): Promise<PublicSettingsResponseDto> {
+    // Get all non-encrypted settings
+    const publicSettings = await this.appSettingsRepository.find({
+      where: { isEncrypted: false },
+    });
+
+    // Build response DTO
+    const response: PublicSettingsResponseDto = {};
+
+    // Map settings by key
+    for (const setting of publicSettings) {
+      switch (setting.key) {
+        case 'firebase_public_config':
+          response.firebase = setting.value;
+          break;
+        case 'app_colors':
+          response.colors = setting.value;
+          break;
+        case 'app_labels':
+          response.labels = setting.value;
+          break;
+        case 'i18n_config':
+          response.i18n = setting.value;
+          break;
+        case 'general_config':
+          response.general = setting.value;
+          break;
+        case 'app_links':
+          response.links = setting.value;
+          break;
+        default:
+          // Ignore other settings
+          break;
+      }
+    }
+
+    return response;
+  }
 
   /**
    * Get all settings grouped by category

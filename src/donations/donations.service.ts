@@ -13,6 +13,7 @@ import { CreateDonationDto, QueryDonationsDto } from './dto';
 import { DonationStatus } from '../common/enums';
 import { NotchPayService } from '../common/services';
 import { FundsService } from '../funds/funds.service';
+import { NotificationsService } from '../notifications/services/notifications.service';
 
 /**
  * Service for managing donations with NotchPay integration
@@ -30,6 +31,7 @@ export class DonationsService {
     private readonly activityLogRepository: Repository<AdminActivityLog>,
     private readonly notchPayService: NotchPayService,
     private readonly fundsService: FundsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -190,6 +192,48 @@ export class DonationsService {
   }
 
   /**
+   * Get user's donation history with pagination (mobile app)
+   * @param userId - User ID
+   * @param page - Page number
+   * @param limit - Items per page
+   */
+  async findUserDonations(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    data: Donation[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const query = this.donationRepository
+      .createQueryBuilder('donation')
+      .leftJoinAndSelect('donation.fund', 'fund')
+      .where('donation.userId = :userId', { userId })
+      .orderBy('donation.donatedAt', 'DESC')
+      .addOrderBy('donation.createdAt', 'DESC');
+
+    // Get total count
+    const total = await query.getCount();
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    query.skip(skip).take(limit);
+
+    const data = await query.getMany();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
    * Get donations for a specific fund
    * @param fundId - Fund ID
    */
@@ -233,7 +277,7 @@ export class DonationsService {
     // Find donation by transaction ID
     const donation = await this.donationRepository.findOne({
       where: { transactionId },
-      relations: ['fund'],
+      relations: ['fund', 'user'],
     });
 
     if (!donation) {
@@ -273,7 +317,34 @@ export class DonationsService {
         `Donation ${donation.id} completed successfully. Amount: ${donation.amount} ${donation.currency}`,
       );
 
-      // TODO: Send notification to user and admin
+      // Get donation count and total amount for this user
+      const donationCount = await this.donationRepository.count({
+        where: { userId: donation.userId, status: DonationStatus.COMPLETED },
+      });
+
+      const donationsForTotal = await this.donationRepository.find({
+        where: { userId: donation.userId, status: DonationStatus.COMPLETED },
+        select: ['amount'],
+      });
+      const totalAmount = donationsForTotal.reduce((sum, d) => sum + d.amount, 0);
+
+      // Send notification to user
+      try {
+        await this.notificationsService.createDonationConfirmedNotification(
+          donation.userId,
+          donation.id,
+          donation.amount,
+          donation.fund?.titleFr || 'Collecte',
+          donation.fund?.type,
+          donationCount,
+          totalAmount,
+          donation.user?.displayName || undefined,
+        );
+        this.logger.log(`Notification sent for donation ${donation.id}`);
+      } catch (error) {
+        this.logger.error(`Failed to send notification for donation ${donation.id}:`, error);
+        // Don't fail the webhook if notification fails
+      }
     } else if (status === 'failed') {
       donation.status = DonationStatus.FAILED;
       donation.paymentMetadata = {

@@ -322,6 +322,175 @@ export class NotificationTemplatesService {
   }
 
   /**
+   * Get all available triggers with their metadata
+   */
+  getAvailableTriggers(): {
+    value: NotificationTemplateTrigger;
+    labelFr: string;
+    labelEn: string;
+    descriptionFr: string;
+    descriptionEn: string;
+    category: string;
+    exampleVariables: string[];
+  }[] {
+    return [
+      // Donation triggers
+      {
+        value: NotificationTemplateTrigger.DONATION_CONFIRMED,
+        labelFr: 'Don confirmé',
+        labelEn: 'Donation confirmed',
+        descriptionFr: 'Envoyé lorsqu\'un don est confirmé (notification générique)',
+        descriptionEn: 'Sent when a donation is confirmed (generic notification)',
+        category: 'donation',
+        exampleVariables: ['firstName', 'amount', 'currency', 'fundName'],
+      },
+      {
+        value: NotificationTemplateTrigger.DONATION_FIRST,
+        labelFr: 'Premier don',
+        labelEn: 'First donation',
+        descriptionFr: 'Envoyé lors du tout premier don d\'un utilisateur',
+        descriptionEn: 'Sent for user\'s very first donation',
+        category: 'donation',
+        exampleVariables: ['firstName', 'amount', 'currency', 'fundName'],
+      },
+      {
+        value: NotificationTemplateTrigger.DONATION_MILESTONE,
+        labelFr: 'Jalon de don atteint',
+        labelEn: 'Donation milestone',
+        descriptionFr: 'Envoyé lors d\'un jalon (5ème, 10ème, 25ème, 50ème, 100ème don)',
+        descriptionEn: 'Sent on milestone donations (5th, 10th, 25th, 50th, 100th)',
+        category: 'donation',
+        exampleVariables: ['firstName', 'amount', 'donationCount', 'totalAmount'],
+      },
+      {
+        value: NotificationTemplateTrigger.DONATION_TITHE,
+        labelFr: 'Don de dîme',
+        labelEn: 'Tithe donation',
+        descriptionFr: 'Envoyé spécifiquement pour les dons de dîme',
+        descriptionEn: 'Sent specifically for tithe donations',
+        category: 'donation',
+        exampleVariables: ['firstName', 'amount', 'currency'],
+      },
+      {
+        value: NotificationTemplateTrigger.DONATION_OFFERING,
+        labelFr: 'Don d\'offrande',
+        labelEn: 'Offering donation',
+        descriptionFr: 'Envoyé spécifiquement pour les offrandes',
+        descriptionEn: 'Sent specifically for offering donations',
+        category: 'donation',
+        exampleVariables: ['firstName', 'amount', 'currency'],
+      },
+      {
+        value: NotificationTemplateTrigger.DONATION_CAMPAIGN,
+        labelFr: 'Don à une campagne',
+        labelEn: 'Campaign donation',
+        descriptionFr: 'Envoyé pour les dons à une campagne de financement',
+        descriptionEn: 'Sent for donations to a fundraising campaign',
+        category: 'donation',
+        exampleVariables: ['firstName', 'amount', 'fundName', 'fundProgress'],
+      },
+      {
+        value: NotificationTemplateTrigger.DONATION_CAMPAIGN_GOAL_REACHED,
+        labelFr: 'Objectif de campagne atteint',
+        labelEn: 'Campaign goal reached',
+        descriptionFr: 'Envoyé lorsque l\'objectif d\'une campagne est atteint',
+        descriptionEn: 'Sent when a campaign reaches its funding goal',
+        category: 'donation',
+        exampleVariables: ['fundName', 'totalAmount', 'fundProgress'],
+      },
+      {
+        value: NotificationTemplateTrigger.DONATION_LARGE_AMOUNT,
+        labelFr: 'Don d\'un montant important',
+        labelEn: 'Large amount donation',
+        descriptionFr: 'Envoyé pour les dons de montant élevé (≥ 50,000 XAF)',
+        descriptionEn: 'Sent for high-value donations (≥ 50,000 XAF)',
+        category: 'donation',
+        exampleVariables: ['firstName', 'amount', 'currency', 'fundName'],
+      },
+
+      // Event triggers
+      {
+        value: NotificationTemplateTrigger.EVENT_CREATED,
+        labelFr: 'Nouvel événement créé',
+        labelEn: 'New event created',
+        descriptionFr: 'Envoyé lorsqu\'un nouvel événement est créé',
+        descriptionEn: 'Sent when a new event is created',
+        category: 'event',
+        exampleVariables: ['eventTitle', 'eventDate', 'eventTime', 'eventLocation'],
+      },
+      {
+        value: NotificationTemplateTrigger.EVENT_STARTING_SOON,
+        labelFr: 'Événement bientôt',
+        labelEn: 'Event starting soon',
+        descriptionFr: 'Envoyé 1 heure avant le début d\'un événement',
+        descriptionEn: 'Sent 1 hour before an event starts',
+        category: 'event',
+        exampleVariables: ['eventTitle', 'eventDate', 'eventTime', 'eventLocation'],
+      },
+      {
+        value: NotificationTemplateTrigger.EVENT_REMINDER,
+        labelFr: 'Rappel d\'événement',
+        labelEn: 'Event reminder',
+        descriptionFr: 'Rappel pour un événement à venir',
+        descriptionEn: 'Reminder for an upcoming event',
+        category: 'event',
+        exampleVariables: ['eventTitle', 'eventDate', 'eventTime'],
+      },
+
+      // Prayer triggers
+      {
+        value: NotificationTemplateTrigger.PRAYER_REACTION,
+        labelFr: 'Réaction à une prière',
+        labelEn: 'Prayer reaction',
+        descriptionFr: 'Envoyé lorsque quelqu\'un prie ou jeûne pour une demande',
+        descriptionEn: 'Sent when someone prays or fasts for a request',
+        category: 'prayer',
+        exampleVariables: ['firstName', 'prayerCount', 'fastedCount'],
+      },
+
+      // Testimony triggers
+      {
+        value: NotificationTemplateTrigger.TESTIMONY_APPROVED,
+        labelFr: 'Témoignage approuvé',
+        labelEn: 'Testimony approved',
+        descriptionFr: 'Envoyé lorsqu\'un témoignage est approuvé par un admin',
+        descriptionEn: 'Sent when a testimony is approved by an admin',
+        category: 'testimony',
+        exampleVariables: ['firstName'],
+      },
+      {
+        value: NotificationTemplateTrigger.TESTIMONY_REJECTED,
+        labelFr: 'Témoignage rejeté',
+        labelEn: 'Testimony rejected',
+        descriptionFr: 'Envoyé lorsqu\'un témoignage est rejeté',
+        descriptionEn: 'Sent when a testimony is rejected',
+        category: 'testimony',
+        exampleVariables: ['firstName'],
+      },
+
+      // General triggers
+      {
+        value: NotificationTemplateTrigger.WELCOME_MESSAGE,
+        labelFr: 'Message de bienvenue',
+        labelEn: 'Welcome message',
+        descriptionFr: 'Envoyé lors de l\'inscription d\'un nouvel utilisateur',
+        descriptionEn: 'Sent when a new user signs up',
+        category: 'general',
+        exampleVariables: ['firstName', 'displayName'],
+      },
+      {
+        value: NotificationTemplateTrigger.MONTHLY_REPORT,
+        labelFr: 'Rapport mensuel',
+        labelEn: 'Monthly report',
+        descriptionFr: 'Rapport mensuel envoyé aux utilisateurs',
+        descriptionEn: 'Monthly report sent to users',
+        category: 'general',
+        exampleVariables: ['firstName', 'totalAmount', 'donationCount'],
+      },
+    ];
+  }
+
+  /**
    * Get all available variables for a category
    */
   getAvailableVariables(category: string): {

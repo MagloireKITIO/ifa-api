@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsUrl,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventType } from '../../common/enums';
@@ -91,6 +92,7 @@ export class CreateEventDto {
     example: 'https://youtube.com/live/abc123',
     maxLength: 500,
   })
+  @ValidateIf((o) => o.streamLink !== '' && o.streamLink !== null && o.streamLink !== undefined)
   @IsUrl()
   @IsOptional()
   @MaxLength(500)
@@ -101,6 +103,7 @@ export class CreateEventDto {
     example: 'https://youtube.com/watch?v=abc123',
     maxLength: 500,
   })
+  @ValidateIf((o) => o.replayLink !== '' && o.replayLink !== null && o.replayLink !== undefined)
   @IsUrl()
   @IsOptional()
   @MaxLength(500)
@@ -111,6 +114,7 @@ export class CreateEventDto {
     example: 'https://storage.supabase.co/events/cover-123.jpg',
     maxLength: 500,
   })
+  @ValidateIf((o) => o.coverImage !== '' && o.coverImage !== null && o.coverImage !== undefined)
   @IsUrl()
   @IsOptional()
   @MaxLength(500)

@@ -59,6 +59,21 @@ export class NotificationTemplatesController {
     return this.templatesService.findAll(queryDto);
   }
 
+  @Get('triggers')
+  @RequirePermissions(AdminPermission.NOTIFICATIONS_READ)
+  @ApiOperation({
+    summary: 'Get all available notification triggers',
+    description:
+      'Get a list of all available notification triggers with their labels, descriptions, and example variables in both French and English.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Triggers retrieved successfully',
+  })
+  async getAvailableTriggers() {
+    return this.templatesService.getAvailableTriggers();
+  }
+
   @Get('variables/:category')
   @RequirePermissions(AdminPermission.NOTIFICATIONS_READ)
   @ApiOperation({

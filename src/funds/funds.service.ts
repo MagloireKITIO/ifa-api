@@ -156,6 +156,95 @@ export class FundsService {
   }
 
   /**
+   * Get active funds with pagination for public display (mobile app)
+   * @param type - Optional fund type filter
+   * @param page - Page number
+   * @param limit - Items per page
+   */
+  async findPublicFunds(
+    type?: FundType,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    data: Fund[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const query = this.fundRepository
+      .createQueryBuilder('fund')
+      .where('fund.status = :status', { status: FundStatus.ACTIVE });
+
+    // Filter by type if provided
+    if (type) {
+      query.andWhere('fund.type = :type', { type });
+    }
+
+    // Order: TITHE and OFFERING first, then CAMPAIGNS by creation date
+    query.orderBy(
+      `CASE
+        WHEN fund.type = '${FundType.TITHE}' THEN 1
+        WHEN fund.type = '${FundType.OFFERING}' THEN 2
+        WHEN fund.type = '${FundType.CAMPAIGN}' THEN 3
+        ELSE 4
+      END`,
+    );
+    query.addOrderBy('fund.createdAt', 'DESC');
+
+    // Get total count
+    const total = await query.getCount();
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    query.skip(skip).take(limit);
+
+    const data = await query.getMany();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Get active campaigns only for public display (mobile app)
+   */
+  async findPublicCampaigns(): Promise<Fund[]> {
+    return this.fundRepository.find({
+      where: {
+        status: FundStatus.ACTIVE,
+        type: FundType.CAMPAIGN,
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Get a single active fund by ID for public display (mobile app)
+   * @param id - Fund ID
+   */
+  async findPublicFundById(id: string): Promise<Fund> {
+    const fund = await this.fundRepository.findOne({
+      where: {
+        id,
+        status: FundStatus.ACTIVE,
+      },
+    });
+
+    if (!fund) {
+      throw new NotFoundException(
+        `Active fund with ID "${id}" not found`,
+      );
+    }
+
+    return fund;
+  }
+
+  /**
    * Get a single fund by ID
    * @param id - Fund ID
    */

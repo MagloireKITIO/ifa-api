@@ -467,4 +467,36 @@ export class NotificationsService {
       },
     });
   }
+
+  /**
+   * Notify all users who reacted to a prayer when a testimony is added
+   * @param userIds - Array of user IDs who reacted to the prayer
+   * @param prayerId - Prayer ID
+   * @param prayerAuthorName - Name of the prayer author (or "Anonyme")
+   */
+  async createPrayerTestimonyNotification(
+    userIds: string[],
+    prayerId: string,
+    prayerAuthorName: string,
+  ): Promise<void> {
+    if (userIds.length === 0) {
+      return; // Aucune personne à notifier
+    }
+
+    await this.sendNotification(
+      {
+        userIds,
+        type: NotificationType.PRAYER,
+        titleFr: 'Prière exaucée ! 🙏',
+        titleEn: 'Prayer Answered! 🙏',
+        bodyFr: `${prayerAuthorName} témoigne que Dieu a exaucé sa prière`,
+        bodyEn: `${prayerAuthorName} testifies that God answered their prayer`,
+        data: {
+          prayerId,
+          deepLink: `/prayers/${prayerId}`,
+        },
+      },
+      'fr',
+    );
+  }
 }

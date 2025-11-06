@@ -2,24 +2,29 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, LessThanOrEqual, MoreThanOrEqual, IsNull } from 'typeorm';
 import { Event } from '../entities/event.entity';
 import { AdminActivityLog } from '../entities/admin-activity-log.entity';
 import { CreateEventDto, UpdateEventDto, QueryEventsDto, UpdateReplayLinkDto } from './dto';
-import { EventStatus, Language } from '../common/enums';
+import { EventStatus, EventType, Language } from '../common/enums';
+import { NotificationsService } from '../notifications/services/notifications.service';
 
 /**
  * Service for managing events with activity logging
  */
 @Injectable()
 export class EventsService {
+  private readonly logger = new Logger(EventsService.name);
+
   constructor(
     @InjectRepository(Event)
     private readonly eventRepository: Repository<Event>,
     @InjectRepository(AdminActivityLog)
     private readonly activityLogRepository: Repository<AdminActivityLog>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -66,6 +71,19 @@ export class EventsService {
       ipAddress,
       userAgent,
     );
+
+    // Send notification to all users about new event
+    try {
+      await this.notificationsService.createEventNotification(
+        savedEvent.id,
+        savedEvent.titleFr,
+        savedEvent.titleEn,
+      );
+      this.logger.log(`Notification sent for new event: ${savedEvent.id}`);
+    } catch (error) {
+      this.logger.error(`Failed to send notification for event ${savedEvent.id}:`, error);
+      // Don't fail event creation if notification fails
+    }
 
     return savedEvent;
   }
@@ -338,6 +356,163 @@ export class EventsService {
    */
   async markNotificationSent(id: string): Promise<void> {
     await this.eventRepository.update(id, { notificationSent: true });
+  }
+
+  /**
+   * ============================================
+   * PUBLIC ENDPOINTS FOR MOBILE APP
+   * ============================================
+   */
+
+  /**
+   * Get all public events with pagination
+   * GET /events/public
+   */
+  async findAllPublic(
+    page: number = 1,
+    limit: number = 10,
+    type?: EventType,
+    status?: EventStatus,
+    centerId?: string,
+  ): Promise<{
+    data: Event[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const query = this.eventRepository
+      .createQueryBuilder('event')
+      .leftJoinAndSelect('event.center', 'center');
+
+    // Apply filters
+    if (type) {
+      query.andWhere('event.type = :type', { type });
+    }
+
+    if (status) {
+      query.andWhere('event.status = :status', { status });
+    }
+
+    if (centerId) {
+      query.andWhere('event.centerId = :centerId', { centerId });
+    }
+
+    // Order by event date (upcoming first, then descending for past)
+    query.orderBy('event.eventDate', 'DESC');
+
+    // Pagination
+    const skip = (page - 1) * limit;
+    query.skip(skip).take(limit);
+
+    const [data, total] = await query.getManyAndCount();
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  }
+
+  /**
+   * Get a single public event by ID
+   * GET /events/public/:id
+   */
+  async findOnePublic(id: string): Promise<Event> {
+    const event = await this.eventRepository.findOne({
+      where: { id },
+      relations: ['center'],
+    });
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID "${id}" not found`);
+    }
+
+    return event;
+  }
+
+  /**
+   * Get the ongoing event (currently happening)
+   * GET /events/public/ongoing
+   */
+  async findOngoingEvent(): Promise<Event | null> {
+    const event = await this.eventRepository.findOne({
+      where: { status: EventStatus.ONGOING },
+      relations: ['center'],
+      order: { eventDate: 'DESC' },
+    });
+
+    return event || null;
+  }
+
+  /**
+   * Get the next upcoming event (soonest)
+   * GET /events/public/upcoming
+   */
+  async findNextUpcomingEvent(): Promise<Event | null> {
+    const now = new Date();
+
+    const event = await this.eventRepository.findOne({
+      where: { status: EventStatus.UPCOMING },
+      relations: ['center'],
+      order: { eventDate: 'ASC' },
+    });
+
+    return event || null;
+  }
+
+  /**
+   * Get list of upcoming events
+   * GET /events/public/upcoming-list
+   */
+  async findUpcomingEvents(limit: number = 10): Promise<Event[]> {
+    const now = new Date();
+
+    const events = await this.eventRepository.find({
+      where: { status: EventStatus.UPCOMING },
+      relations: ['center'],
+      order: { eventDate: 'ASC' },
+      take: limit,
+    });
+
+    return events;
+  }
+
+  /**
+   * Get list of past events (replays)
+   * GET /events/public/past
+   */
+  async findPastEvents(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    data: Event[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const query = this.eventRepository
+      .createQueryBuilder('event')
+      .leftJoinAndSelect('event.center', 'center')
+      .where('event.status = :status', { status: EventStatus.PAST })
+      .orderBy('event.eventDate', 'DESC');
+
+    // Pagination
+    const skip = (page - 1) * limit;
+    query.skip(skip).take(limit);
+
+    const [data, total] = await query.getManyAndCount();
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
   }
 
   /**

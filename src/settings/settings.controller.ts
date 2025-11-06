@@ -19,20 +19,35 @@ import {
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { SettingsService } from './services';
-import { UpdateSettingDto } from './dto';
+import { UpdateSettingDto, PublicSettingsResponseDto } from './dto';
 import { JwtAdminAuthGuard, PermissionsGuard } from '../auth-admin/guards';
 import { RequirePermissions, CurrentAdmin } from '../auth-admin/decorators';
 import { AdminPermission, AppSettingsCategory } from '../common/enums';
 import { Admin } from '../entities/admin.entity';
 
 @ApiTags('Settings')
-@ApiBearerAuth()
 @Controller('settings')
-@UseGuards(JwtAdminAuthGuard, PermissionsGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
+  @Get('public')
+  @ApiOperation({
+    summary: 'Get public settings (no authentication required)',
+    description:
+      'Retrieve public settings for the mobile application. Only returns non-sensitive settings (isEncrypted = false).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Public settings retrieved successfully',
+    type: PublicSettingsResponseDto,
+  })
+  async getPublicSettings(): Promise<PublicSettingsResponseDto> {
+    return this.settingsService.getPublicSettings();
+  }
+
   @Get()
+  @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
+  @ApiBearerAuth()
   @RequirePermissions(AdminPermission.SETTINGS_READ)
   @ApiOperation({
     summary: 'Get all settings',
@@ -50,6 +65,8 @@ export class SettingsController {
   }
 
   @Get('category/:category')
+  @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
+  @ApiBearerAuth()
   @RequirePermissions(AdminPermission.SETTINGS_READ)
   @ApiOperation({
     summary: 'Get settings by category',
@@ -73,6 +90,8 @@ export class SettingsController {
   }
 
   @Get('key/:key')
+  @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
+  @ApiBearerAuth()
   @RequirePermissions(AdminPermission.SETTINGS_READ)
   @ApiOperation({
     summary: 'Get setting by key',
@@ -95,6 +114,8 @@ export class SettingsController {
   }
 
   @Put()
+  @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
+  @ApiBearerAuth()
   @RequirePermissions(AdminPermission.SETTINGS_UPDATE)
   @ApiOperation({
     summary: 'Update or create a setting',
@@ -128,6 +149,8 @@ export class SettingsController {
   }
 
   @Delete(':key')
+  @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
+  @ApiBearerAuth()
   @RequirePermissions(AdminPermission.SETTINGS_UPDATE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -163,6 +186,8 @@ export class SettingsController {
   }
 
   @Get('logs')
+  @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
+  @ApiBearerAuth()
   @RequirePermissions(AdminPermission.SETTINGS_READ)
   @ApiOperation({
     summary: 'Get settings activity logs',
@@ -179,6 +204,8 @@ export class SettingsController {
   }
 
   @Put('cache/reload')
+  @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
+  @ApiBearerAuth()
   @RequirePermissions(AdminPermission.SETTINGS_UPDATE)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

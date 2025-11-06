@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,19 +13,24 @@ import {
   ApproveTestimonyDto,
   RejectTestimonyDto,
   QueryTestimoniesDto,
+  CreateTestimonyDto,
 } from './dto';
 import { TestimonyStatus } from '../common/enums';
+import { NotificationsService } from '../notifications/services/notifications.service';
 
 /**
  * Service for managing testimonies with admin moderation
  */
 @Injectable()
 export class TestimoniesService {
+  private readonly logger = new Logger(TestimoniesService.name);
+
   constructor(
     @InjectRepository(Testimony)
     private readonly testimonyRepository: Repository<Testimony>,
     @InjectRepository(AdminActivityLog)
     private readonly activityLogRepository: Repository<AdminActivityLog>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -176,8 +183,19 @@ export class TestimoniesService {
       userAgent,
     );
 
-    // TODO: Send notification to user (if not anonymous)
-    // This will be implemented when notification module is ready
+    // Send notification to user (if not anonymous)
+    if (!testimony.isAnonymous && testimony.userId) {
+      try {
+        await this.notificationsService.createTestimonyApprovedNotification(
+          testimony.userId,
+          testimony.id,
+        );
+        this.logger.log(`Notification sent for approved testimony: ${testimony.id}`);
+      } catch (error) {
+        this.logger.error(`Failed to send notification for testimony ${testimony.id}:`, error);
+        // Don't fail the approval if notification fails
+      }
+    }
 
     return updated;
   }
@@ -224,6 +242,24 @@ export class TestimoniesService {
       ipAddress,
       userAgent,
     );
+
+    // Send notification to user (if not anonymous) about rejection
+    // Note: We could create a TESTIMONY_REJECTED notification template if needed
+    // For now, we'll skip this as it might be sensitive
+    // Uncomment below if you want to notify users about rejections:
+    /*
+    if (!testimony.isAnonymous && testimony.userId) {
+      try {
+        await this.notificationsService.createTestimonyRejectedNotification(
+          testimony.userId,
+          testimony.id,
+        );
+        this.logger.log(`Notification sent for rejected testimony: ${testimony.id}`);
+      } catch (error) {
+        this.logger.error(`Failed to send notification for testimony ${testimony.id}:`, error);
+      }
+    }
+    */
 
     return updated;
   }
@@ -286,6 +322,165 @@ export class TestimoniesService {
     ]);
 
     return { pending, approved, rejected, total };
+  }
+
+  /**
+   * ============================================
+   * PUBLIC & USER ENDPOINTS FOR MOBILE APP
+   * ============================================
+   */
+
+  /**
+   * Get all approved testimonies with pagination (PUBLIC)
+   * GET /testimonies/public
+   *
+   * LOGIQUE :
+   * - Accessible sans authentification
+   * - Retourne uniquement les témoignages APPROVED
+   * - Cache les infos user si isAnonymous = true
+   * - Triés par date d'approbation (plus récents d'abord)
+   */
+  async findAllPublic(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: Testimony[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const query = this.testimonyRepository
+      .createQueryBuilder('testimony')
+      .leftJoinAndSelect('testimony.user', 'user')
+      .where('testimony.status = :status', { status: TestimonyStatus.APPROVED })
+      .orderBy('testimony.approvedAt', 'DESC');
+
+    // Pagination
+    const skip = (page - 1) * limit;
+    query.skip(skip).take(limit);
+
+    const [data, total] = await query.getManyAndCount();
+    const totalPages = Math.ceil(total / limit);
+
+    // Hide user info for anonymous testimonies
+    const testimonies = data.map((testimony) => {
+      if (testimony.isAnonymous) {
+        (testimony as any).user = undefined;
+      }
+      return testimony;
+    });
+
+    return {
+      data: testimonies,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  }
+
+  /**
+   * Get a single approved testimony by ID (PUBLIC)
+   * GET /testimonies/public/:id
+   */
+  async findOnePublic(id: string): Promise<Testimony> {
+    const testimony = await this.testimonyRepository.findOne({
+      where: { id, status: TestimonyStatus.APPROVED },
+      relations: ['user'],
+    });
+
+    if (!testimony) {
+      throw new NotFoundException(`Testimony with ID "${id}" not found`);
+    }
+
+    // Hide user info for anonymous testimonies
+    if (testimony.isAnonymous) {
+      (testimony as any).user = undefined;
+    }
+
+    return testimony;
+  }
+
+  /**
+   * Create a new testimony (USER AUTH)
+   * POST /testimonies
+   *
+   * LOGIQUE :
+   * - L'utilisateur doit être authentifié
+   * - Créé avec status PENDING (en attente de modération)
+   * - L'admin devra l'approuver avant qu'il soit visible publiquement
+   */
+  async create(
+    userId: string,
+    createTestimonyDto: CreateTestimonyDto,
+  ): Promise<any> {
+    // Validate: at least one content field must be provided
+    if (!createTestimonyDto.contentFr && !createTestimonyDto.contentEn) {
+      throw new BadRequestException(
+        'At least one content field (contentFr or contentEn) must be provided',
+      );
+    }
+
+    const testimony = this.testimonyRepository.create({
+      userId: createTestimonyDto.isAnonymous ? null : userId,
+      contentFr: createTestimonyDto.contentFr || null,
+      contentEn: createTestimonyDto.contentEn || null,
+      isAnonymous: createTestimonyDto.isAnonymous,
+      language: createTestimonyDto.language,
+      status: TestimonyStatus.PENDING,
+      submittedAt: new Date(),
+    } as any);
+
+    return await this.testimonyRepository.save(testimony);
+  }
+
+  /**
+   * Get my testimonies (USER AUTH)
+   * GET /testimonies/my-testimonies
+   *
+   * LOGIQUE :
+   * - Retourne tous les témoignages de l'utilisateur connecté
+   * - Inclut tous les statuts (PENDING, APPROVED, REJECTED)
+   * - Permet à l'utilisateur de voir l'état de ses soumissions
+   */
+  async findMyTestimonies(userId: string): Promise<Testimony[]> {
+    return this.testimonyRepository.find({
+      where: { userId },
+      relations: ['user'],
+      order: { submittedAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Delete my testimony (USER AUTH)
+   * DELETE /testimonies/:id
+   *
+   * LOGIQUE :
+   * - L'utilisateur peut supprimer uniquement ses propres témoignages
+   * - Seulement si le status est PENDING ou REJECTED (pas APPROVED)
+   */
+  async removeByUser(id: string, userId: string): Promise<void> {
+    const testimony = await this.testimonyRepository.findOne({
+      where: { id },
+    });
+
+    if (!testimony) {
+      throw new NotFoundException(`Testimony with ID "${id}" not found`);
+    }
+
+    // Check if user is the testimony author
+    if (testimony.userId !== userId) {
+      throw new ForbiddenException('You can only delete your own testimonies');
+    }
+
+    // Don't allow deletion of approved testimonies
+    if (testimony.status === TestimonyStatus.APPROVED) {
+      throw new ForbiddenException(
+        'Cannot delete an approved testimony. Please contact an admin.',
+      );
+    }
+
+    await this.testimonyRepository.remove(testimony);
   }
 
   /**
