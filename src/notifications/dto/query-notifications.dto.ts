@@ -1,5 +1,5 @@
 import { IsOptional, IsEnum, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { NotificationType } from '../../common/enums';
 
 export class QueryNotificationsDto {
@@ -8,7 +8,11 @@ export class QueryNotificationsDto {
   type?: NotificationType;
 
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
   @IsBoolean()
   isRead?: boolean;
 

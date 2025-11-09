@@ -35,7 +35,7 @@ import { Testimony } from '../entities/testimony.entity';
  * - DELETE /testimonies/:id : Supprimer un témoignage non approuvé
  */
 @ApiTags('Testimonies User (Mobile)')
-@Controller('testimonies')
+@Controller('user/testimonies')
 @UseGuards(JwtUserAuthGuard)
 @ApiBearerAuth()
 export class TestimoniesUserController {

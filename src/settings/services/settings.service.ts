@@ -22,7 +22,7 @@ export class SettingsService {
 
   /**
    * Get public settings for mobile app
-   * Returns only non-encrypted settings
+   * Returns only non-encrypted settings + Supabase public config (url + anonKey)
    */
   async getPublicSettings(): Promise<PublicSettingsResponseDto> {
     // Get all non-encrypted settings
@@ -58,6 +58,52 @@ export class SettingsService {
           // Ignore other settings
           break;
       }
+    }
+
+    // Get Supabase config (might be encrypted, so use ConfigurationService)
+    // Only expose public fields: url and anonKey (NOT serviceRoleKey)
+    try {
+      const supabaseConfig = await this.configurationService.get<{
+        url?: string;
+        anonKey?: string;
+        serviceRoleKey?: string;
+      }>('supabase_config');
+
+      if (supabaseConfig && supabaseConfig.url && supabaseConfig.anonKey) {
+        response.supabase = {
+          url: supabaseConfig.url,
+          anonKey: supabaseConfig.anonKey,
+          // IMPORTANT: Do NOT expose serviceRoleKey - it's a secret!
+        };
+      }
+    } catch (error) {
+      // Supabase config not found or error - it's optional
+      console.warn('Supabase config not available for public settings:', error);
+    }
+
+    // Get Google OAuth config (might be encrypted, so use ConfigurationService)
+    // Only expose public client IDs (NOT client secrets!)
+    try {
+      const googleConfig = await this.configurationService.get<{
+        webClientId?: string;
+        iosClientId?: string;
+        androidClientId?: string;
+        expoClientId?: string;
+        clientSecret?: string; // This should NOT be exposed
+      }>('google_oauth_config');
+
+      if (googleConfig && googleConfig.webClientId) {
+        response.google = {
+          webClientId: googleConfig.webClientId,
+          iosClientId: googleConfig.iosClientId,
+          androidClientId: googleConfig.androidClientId,
+          expoClientId: googleConfig.expoClientId,
+          // IMPORTANT: Do NOT expose clientSecret - it's a secret!
+        };
+      }
+    } catch (error) {
+      // Google OAuth config not found or error - it's optional
+      console.warn('Google OAuth config not available for public settings:', error);
     }
 
     return response;

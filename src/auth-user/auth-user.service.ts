@@ -17,6 +17,7 @@ import {
   PhoneSendOtpDto,
   PhoneVerifyOtpDto,
   CompleteProfileDto,
+  UpdateProfileDto,
   AuthUserResponseDto,
 } from './dto';
 import { JwtUserPayload } from './interfaces';
@@ -120,7 +121,8 @@ export class AuthUserService {
     const refreshToken = this.generateRefreshToken(user);
 
     // Vérifier si le profil est complet
-    const needsProfileCompletion = !user.city || !user.country;
+    // Un utilisateur doit compléter son profil s'il est nouveau OU si les informations essentielles manquent
+    const needsProfileCompletion = isNewUser || !user.displayName || !user.city || !user.country;
 
     return {
       user,
@@ -211,8 +213,10 @@ export class AuthUserService {
     const accessToken = this.generateAccessToken(user);
     const refreshToken = this.generateRefreshToken(user);
 
-    // Le profil n'est pas complet si c'est un nouvel utilisateur
-    const needsProfileCompletion = isNewUser;
+    // Vérifier si le profil est complet
+    // Un utilisateur doit compléter son profil s'il est nouveau OU si les informations essentielles manquent
+    // Pour phone auth, displayName = phoneNumber par défaut, donc on vérifie aussi ça
+    const needsProfileCompletion = isNewUser || !user.displayName || user.displayName === phoneNumber || !user.city || !user.country;
 
     return {
       user,
@@ -294,6 +298,29 @@ export class AuthUserService {
     }
 
     return user;
+  }
+
+  /**
+   * Update Profile
+   * Mettre à jour le profil de l'utilisateur connecté
+   */
+  async updateProfile(
+    userId: string,
+    updateProfileDto: UpdateProfileDto,
+  ): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['center'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Mettre à jour les champs fournis
+    Object.assign(user, updateProfileDto);
+
+    return this.userRepository.save(user);
   }
 
   /**

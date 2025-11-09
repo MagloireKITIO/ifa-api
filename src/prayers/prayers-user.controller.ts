@@ -40,7 +40,7 @@ import { Prayer } from '../entities/prayer.entity';
  * - GET /prayers/my-prayers : Mes demandes de prière
  */
 @ApiTags('Prayers User (Mobile)')
-@Controller('prayers')
+@Controller('user/prayers')
 @UseGuards(JwtUserAuthGuard)
 @ApiBearerAuth()
 export class PrayersUserController {

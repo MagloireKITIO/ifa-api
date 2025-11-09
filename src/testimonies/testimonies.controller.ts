@@ -32,7 +32,7 @@ import { Admin } from '../entities/admin.entity';
 
 @ApiTags('Testimonies')
 @ApiBearerAuth()
-@Controller('testimonies')
+@Controller('admin/testimonies')
 @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
 export class TestimoniesController {
   constructor(private readonly testimoniesService: TestimoniesService) {}

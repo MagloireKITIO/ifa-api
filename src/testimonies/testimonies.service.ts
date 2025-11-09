@@ -350,6 +350,7 @@ export class TestimoniesService {
     const query = this.testimonyRepository
       .createQueryBuilder('testimony')
       .leftJoinAndSelect('testimony.user', 'user')
+      .leftJoinAndSelect('testimony.prayer', 'prayer')
       .where('testimony.status = :status', { status: TestimonyStatus.APPROVED })
       .orderBy('testimony.approvedAt', 'DESC');
 
@@ -386,7 +387,7 @@ export class TestimoniesService {
   async findOnePublic(id: string): Promise<Testimony> {
     const testimony = await this.testimonyRepository.findOne({
       where: { id, status: TestimonyStatus.APPROVED },
-      relations: ['user'],
+      relations: ['user', 'prayer'],
     });
 
     if (!testimony) {
@@ -426,6 +427,7 @@ export class TestimoniesService {
       contentFr: createTestimonyDto.contentFr || null,
       contentEn: createTestimonyDto.contentEn || null,
       isAnonymous: createTestimonyDto.isAnonymous,
+      prayerId: createTestimonyDto.prayerId || null,
       language: createTestimonyDto.language,
       status: TestimonyStatus.PENDING,
       submittedAt: new Date(),
@@ -446,7 +448,7 @@ export class TestimoniesService {
   async findMyTestimonies(userId: string): Promise<Testimony[]> {
     return this.testimonyRepository.find({
       where: { userId },
-      relations: ['user'],
+      relations: ['user', 'prayer'],
       order: { submittedAt: 'DESC' },
     });
   }

@@ -37,7 +37,7 @@ import { Admin } from '../entities/admin.entity';
  */
 @ApiTags('Centers - Admin')
 @ApiBearerAuth()
-@Controller('centers')
+@Controller('admin/centers')
 @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
 export class CentersController {
   constructor(private readonly centersService: CentersService) {}

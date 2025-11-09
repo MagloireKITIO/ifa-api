@@ -5,6 +5,7 @@ import { TestimoniesPublicController } from './testimonies-public.controller';
 import { TestimoniesUserController } from './testimonies-user.controller';
 import { TestimoniesService } from './testimonies.service';
 import { Testimony } from '../entities/testimony.entity';
+import { Prayer } from '../entities/prayer.entity';
 import { AdminActivityLog } from '../entities/admin-activity-log.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthUserModule } from '../auth-user/auth-user.module';
@@ -24,7 +25,7 @@ import { AuthUserModule } from '../auth-user/auth-user.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Testimony, AdminActivityLog]),
+    TypeOrmModule.forFeature([Testimony, Prayer, AdminActivityLog]),
     forwardRef(() => NotificationsModule), // For NotificationsService
     AuthUserModule, // Pour utiliser les guards et strategies JWT
   ],

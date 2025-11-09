@@ -11,6 +11,7 @@ import {
 import { TestimonyStatus, Language } from '../common/enums';
 import { User } from './user.entity';
 import { Admin } from './admin.entity';
+import { Prayer } from './prayer.entity';
 
 @Entity('testimonies')
 @Index(['status'])
@@ -38,6 +39,17 @@ export class Testimony {
     comment: 'Whether this testimony is anonymous',
   })
   isAnonymous: boolean;
+
+  @Column({
+    type: 'uuid',
+    nullable: true,
+    comment: 'ID of the prayer this testimony is linked to (for answered prayers)',
+  })
+  prayerId: string;
+
+  @ManyToOne(() => Prayer, { nullable: true })
+  @JoinColumn({ name: 'prayerId' })
+  prayer: Prayer;
 
   @Column({
     type: 'text',

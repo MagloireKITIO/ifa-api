@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   UseGuards,
   HttpCode,
@@ -21,6 +22,7 @@ import {
   PhoneSendOtpDto,
   PhoneVerifyOtpDto,
   CompleteProfileDto,
+  UpdateProfileDto,
   RefreshTokenDto,
   AuthUserResponseDto,
 } from './dto';
@@ -195,5 +197,34 @@ export class AuthUserController {
   })
   async getMe(@CurrentUser() user: User): Promise<User> {
     return this.authUserService.getMe(user.id);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtUserAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Update current user profile',
+    description: 'Update the profile of the currently authenticated user',
+  })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile updated successfully',
+    type: User,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+  })
+  async updateProfile(
+    @CurrentUser() user: User,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ): Promise<User> {
+    return this.authUserService.updateProfile(user.id, updateProfileDto);
   }
 }

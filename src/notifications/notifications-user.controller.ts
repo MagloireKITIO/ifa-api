@@ -1,10 +1,12 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Param,
   Query,
+  Body,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -17,12 +19,14 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { NotificationsService } from './services/notifications.service';
+import { FCMTokensService } from './services/fcm-tokens.service';
 import { JwtUserAuthGuard } from '../auth-user/guards';
 import { CurrentUser } from '../auth-user/decorators';
 import {
   QueryNotificationsDto,
   NotificationUserResponseDto,
   PaginatedNotificationsResponseDto,
+  RegisterFCMTokenDto,
 } from './dto';
 import { Notification } from '../entities/notification.entity';
 
@@ -42,7 +46,65 @@ import { Notification } from '../entities/notification.entity';
 @UseGuards(JwtUserAuthGuard)
 @ApiBearerAuth()
 export class NotificationsUserController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly fcmTokensService: FCMTokensService,
+  ) {}
+
+  /**
+   * POST /notifications/register-token
+   * Enregistrer un token FCM pour recevoir des notifications push
+   */
+  @Post('register-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Enregistrer un token FCM',
+    description: 'Enregistre un token FCM de l\'appareil pour recevoir des notifications push',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Token enregistré avec succès',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Token invalide',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Non authentifié',
+  })
+  async registerToken(
+    @CurrentUser('sub') userId: string,
+    @Body() registerTokenDto: RegisterFCMTokenDto,
+  ) {
+    return this.fcmTokensService.registerToken(userId, registerTokenDto);
+  }
+
+  /**
+   * DELETE /notifications/deactivate-token/:token
+   * Désactiver un token FCM (par exemple, lors de la déconnexion)
+   */
+  @Delete('deactivate-token/:token')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Désactiver un token FCM',
+    description: 'Désactive un token FCM de l\'appareil (par exemple, lors de la déconnexion)',
+  })
+  @ApiParam({
+    name: 'token',
+    description: 'Token FCM à désactiver',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Token désactivé avec succès',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Non authentifié',
+  })
+  async deactivateToken(@Param('token') token: string) {
+    await this.fcmTokensService.deactivateToken(token);
+  }
 
   /**
    * GET /notifications/my-notifications

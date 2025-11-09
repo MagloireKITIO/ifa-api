@@ -34,7 +34,7 @@ import { Admin } from '../entities/admin.entity';
 
 @ApiTags('Funds')
 @ApiBearerAuth()
-@Controller('funds')
+@Controller('admin/funds')
 @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
 export class FundsController {
   constructor(private readonly fundsService: FundsService) {}

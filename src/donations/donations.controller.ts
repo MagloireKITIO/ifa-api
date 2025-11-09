@@ -30,7 +30,7 @@ import { Admin } from '../entities/admin.entity';
 import { NotchPayService } from '../common/services';
 
 @ApiTags('Donations')
-@Controller('donations')
+@Controller('admin/donations')
 export class DonationsController {
   constructor(
     private readonly donationsService: DonationsService,

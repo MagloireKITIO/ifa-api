@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import { IsString, IsBoolean, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Language } from '../../common/enums';
 
@@ -9,6 +9,7 @@ import { Language } from '../../common/enums';
  * LOGIQUE :
  * - L'utilisateur soumet son témoignage en FR ou EN
  * - Il peut choisir de rester anonyme
+ * - Peut être lié à une prière exaucée (prayerId optionnel)
  * - Le témoignage est créé avec status PENDING
  * - L'admin devra l'approuver avant qu'il soit visible publiquement
  */
@@ -36,6 +37,14 @@ export class CreateTestimonyDto {
   })
   @IsBoolean()
   isAnonymous: boolean;
+
+  @ApiPropertyOptional({
+    description: 'ID de la prière à laquelle ce témoignage est lié (pour les prières exaucées)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
+  @IsUUID()
+  prayerId?: string;
 
   @ApiProperty({
     description: 'Langue dans laquelle le témoignage a été soumis',

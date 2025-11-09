@@ -28,7 +28,7 @@ import { Admin } from '../entities/admin.entity';
 
 @ApiTags('Prayers')
 @ApiBearerAuth()
-@Controller('prayers')
+@Controller('admin/prayers')
 @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
 export class PrayersController {
   constructor(private readonly prayersService: PrayersService) {}

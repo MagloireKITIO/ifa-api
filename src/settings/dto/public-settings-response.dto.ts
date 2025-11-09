@@ -76,4 +76,31 @@ export class PublicSettingsResponseDto {
     nullable: true,
   })
   links?: Record<string, any> | null;
+
+  @ApiPropertyOptional({
+    description: 'Configuration publique Supabase (url et anonKey uniquement)',
+    example: {
+      url: 'https://xxxxxxxxxxxxx.supabase.co',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    },
+    nullable: true,
+  })
+  supabase?: { url: string; anonKey: string } | null;
+
+  @ApiPropertyOptional({
+    description: 'Configuration Google OAuth pour mobile (Client IDs)',
+    example: {
+      webClientId: '123456789-xxxxxxxxxxxxx.apps.googleusercontent.com',
+      iosClientId: '123456789-xxxxxxxxxxxxx.apps.googleusercontent.com',
+      androidClientId: '123456789-xxxxxxxxxxxxx.apps.googleusercontent.com',
+      expoClientId: '123456789-xxxxxxxxxxxxx.apps.googleusercontent.com',
+    },
+    nullable: true,
+  })
+  google?: {
+    webClientId: string;
+    iosClientId?: string;
+    androidClientId?: string;
+    expoClientId?: string;
+  } | null;
 }
