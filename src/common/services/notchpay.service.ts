@@ -64,6 +64,7 @@ export class NotchPayService {
     callbackUrl?: string;
     email?: string;
     phone?: string;
+    beneficiaryId?: string; // NotchPay beneficiary ID to receive the payment
   }): Promise<{
     authorization_url: string;
     reference: string;
@@ -87,10 +88,12 @@ export class NotchPayService {
           callback: params.callbackUrl,
           email: params.email,
           phone: params.phone,
-          // If account ID is configured, specify it to receive funds directly
-          ...(config.receivingAccountId && {
-            account_id: config.receivingAccountId,
-          }),
+          // Use beneficiaryId if provided, otherwise fallback to config receivingAccountId
+          ...(params.beneficiaryId
+            ? { beneficiary: params.beneficiaryId }
+            : config.receivingAccountId && {
+                account_id: config.receivingAccountId,
+              }),
         }),
       });
 
@@ -146,8 +149,8 @@ export class NotchPayService {
         {
           method: 'GET',
           headers: {
-            Authorization: config.privateKey,
-            'X-Private-Key': config.privateKey,
+            Authorization: config.publicKey,
+            'X-Grant': config.privateKey,
           },
         },
       );
@@ -252,8 +255,8 @@ export class NotchPayService {
         {
           method: 'GET',
           headers: {
-            Authorization: config.privateKey,
-            'X-Private-Key': config.privateKey,
+            Authorization: config.publicKey,
+            'X-Grant': config.privateKey,
           },
         },
       );
@@ -286,15 +289,19 @@ export class NotchPayService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: config.privateKey,
-          'X-Private-Key': config.privateKey,
+          Authorization: config.publicKey,
+          'X-Grant': config.privateKey,
         },
         body: JSON.stringify({
           name: createBeneficiaryDto.name,
           phone: createBeneficiaryDto.phone,
           email: createBeneficiaryDto.email,
-          provider: createBeneficiaryDto.provider,
           country: createBeneficiaryDto.country || 'CM',
+          currency: 'XAF', // Required field
+          type: 'mobile_money', // Required field - we only support mobile money for now
+          // Map provider to NotchPay channel format
+          channel: createBeneficiaryDto.provider.replace('cm.mobile.', 'cm.'), // cm.mobile.orange -> cm.orange
+          account_number: createBeneficiaryDto.phone, // Account number = phone number for mobile money
         }),
       });
 
@@ -319,7 +326,7 @@ export class NotchPayService {
         name: data.name || data.beneficiary?.name,
         phone: data.phone || data.beneficiary?.phone,
         email: data.email || data.beneficiary?.email,
-        provider: data.provider || data.beneficiary?.provider,
+        provider: data.provider || data.type || data.beneficiary?.provider || data.beneficiary?.type,
         country: data.country || data.beneficiary?.country || 'CM',
         status: data.status || 'active',
         createdAt: new Date(
@@ -352,8 +359,8 @@ export class NotchPayService {
       const response = await fetch(`${this.NOTCHPAY_API_URL}/beneficiaries`, {
         method: 'GET',
         headers: {
-          Authorization: config.privateKey,
-          'X-Private-Key': config.privateKey,
+          Authorization: config.publicKey,
+          'X-Grant': config.privateKey,
         },
       });
 
@@ -368,14 +375,23 @@ export class NotchPayService {
       }
 
       const data = await response.json();
-      const beneficiaries = data.beneficiaries || data.data || data || [];
+
+      // NotchPay returns beneficiaries in the "items" property
+      const beneficiaries = data.items || data.beneficiaries || data.data || [];
+
+      if (!Array.isArray(beneficiaries)) {
+        this.logger.warn(
+          `Unexpected beneficiaries response format: ${JSON.stringify(data)}`,
+        );
+        return [];
+      }
 
       return beneficiaries.map((b: any) => ({
         id: b.id,
         name: b.name,
         phone: b.phone,
         email: b.email,
-        provider: b.provider,
+        provider: b.provider || b.type,
         country: b.country || 'CM',
         status: b.status || 'active',
         createdAt: new Date(b.created_at || Date.now()),
@@ -409,8 +425,8 @@ export class NotchPayService {
         {
           method: 'GET',
           headers: {
-            Authorization: config.privateKey,
-            'X-Private-Key': config.privateKey,
+            Authorization: config.publicKey,
+            'X-Grant': config.privateKey,
           },
         },
       );
@@ -439,7 +455,7 @@ export class NotchPayService {
         name: b.name,
         phone: b.phone,
         email: b.email,
-        provider: b.provider,
+        provider: b.provider || b.type,
         country: b.country || 'CM',
         status: b.status || 'active',
         createdAt: new Date(b.created_at || Date.now()),
@@ -476,8 +492,8 @@ export class NotchPayService {
         {
           method: 'DELETE',
           headers: {
-            Authorization: config.privateKey,
-            'X-Private-Key': config.privateKey,
+            Authorization: config.publicKey,
+            'X-Grant': config.privateKey,
           },
         },
       );

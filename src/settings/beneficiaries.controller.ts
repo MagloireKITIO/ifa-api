@@ -2,7 +2,9 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
+  Patch,
   Body,
   Param,
   UseGuards,
@@ -18,8 +20,8 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { NotchPayService } from '../common/services';
-import { CreateBeneficiaryDto, BeneficiaryResponseDto } from '../common/dto';
+import { BeneficiariesService } from './services/beneficiaries.service';
+import { CreateBeneficiaryDto, UpdateBeneficiaryDto, BeneficiaryResponseDto } from '../common/dto';
 import { JwtAdminAuthGuard, PermissionsGuard } from '../auth-admin/guards';
 import { RequirePermissions, CurrentAdmin } from '../auth-admin/decorators';
 import { AdminPermission } from '../common/enums';
@@ -30,7 +32,7 @@ import { Admin } from '../entities/admin.entity';
 @Controller('beneficiaries')
 @UseGuards(JwtAdminAuthGuard, PermissionsGuard)
 export class BeneficiariesController {
-  constructor(private readonly notchPayService: NotchPayService) {}
+  constructor(private readonly beneficiariesService: BeneficiariesService) {}
 
   @Post()
   @RequirePermissions(AdminPermission.SETTINGS_UPDATE)
@@ -54,7 +56,7 @@ export class BeneficiariesController {
     @Body() createBeneficiaryDto: CreateBeneficiaryDto,
     @CurrentAdmin() admin: Admin,
   ): Promise<BeneficiaryResponseDto> {
-    return this.notchPayService.createBeneficiary(createBeneficiaryDto);
+    return this.beneficiariesService.createBeneficiary(createBeneficiaryDto);
   }
 
   @Get()
@@ -77,7 +79,7 @@ export class BeneficiariesController {
   async getBeneficiaries(
     @CurrentAdmin() admin: Admin,
   ): Promise<BeneficiaryResponseDto[]> {
-    return this.notchPayService.getBeneficiaries();
+    return this.beneficiariesService.getBeneficiaries();
   }
 
   @Get(':id')
@@ -107,7 +109,39 @@ export class BeneficiariesController {
     @Param('id') id: string,
     @CurrentAdmin() admin: Admin,
   ): Promise<BeneficiaryResponseDto> {
-    return this.notchPayService.getBeneficiary(id);
+    return this.beneficiariesService.getBeneficiary(id);
+  }
+
+  @Put(':id')
+  @RequirePermissions(AdminPermission.SETTINGS_UPDATE)
+  @ApiOperation({
+    summary: 'Update a beneficiary',
+    description:
+      'Update beneficiary information in local database. Note: NotchPay API does not support updating beneficiaries. Only accessible by super-admin or admins with settings:update permission.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'NotchPay beneficiary ID',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Beneficiary updated successfully',
+    type: BeneficiaryResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions',
+  })
+  @ApiResponse({ status: 404, description: 'Beneficiary not found' })
+  async updateBeneficiary(
+    @Param('id') id: string,
+    @Body() updateBeneficiaryDto: UpdateBeneficiaryDto,
+    @CurrentAdmin() admin: Admin,
+  ): Promise<BeneficiaryResponseDto> {
+    return this.beneficiariesService.updateBeneficiary(id, updateBeneficiaryDto);
   }
 
   @Delete(':id')
@@ -137,6 +171,56 @@ export class BeneficiariesController {
     @Param('id') id: string,
     @CurrentAdmin() admin: Admin,
   ): Promise<void> {
-    return this.notchPayService.deleteBeneficiary(id);
+    return this.beneficiariesService.deleteBeneficiary(id);
+  }
+
+  @Patch(':id/toggle')
+  @RequirePermissions(AdminPermission.SETTINGS_UPDATE)
+  @ApiOperation({
+    summary: 'Toggle beneficiary active status',
+    description:
+      'Activate or deactivate a beneficiary account. Only one beneficiary can be active at a time to receive payments. Only accessible by super-admin or admins with settings:update permission.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'NotchPay beneficiary ID',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Beneficiary status toggled successfully',
+    type: BeneficiaryResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions',
+  })
+  @ApiResponse({ status: 404, description: 'Beneficiary not found' })
+  async toggleBeneficiary(
+    @Param('id') id: string,
+    @CurrentAdmin() admin: Admin,
+  ): Promise<BeneficiaryResponseDto> {
+    return this.beneficiariesService.toggleBeneficiary(id);
+  }
+
+  @Post('sync')
+  @RequirePermissions(AdminPermission.SETTINGS_UPDATE)
+  @ApiOperation({
+    summary: 'Sync beneficiaries from NotchPay',
+    description:
+      'Synchronize beneficiaries from NotchPay API to local database. Useful for initial setup or recovering from data loss. Only accessible by super-admin or admins with settings:update permission.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Beneficiaries synced successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions',
+  })
+  async syncBeneficiaries(@CurrentAdmin() admin: Admin): Promise<void> {
+    return this.beneficiariesService.syncFromNotchPay();
   }
 }

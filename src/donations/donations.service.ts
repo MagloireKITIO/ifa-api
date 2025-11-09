@@ -14,6 +14,7 @@ import { DonationStatus } from '../common/enums';
 import { NotchPayService } from '../common/services';
 import { FundsService } from '../funds/funds.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
+import { BeneficiariesService } from '../settings/services/beneficiaries.service';
 
 /**
  * Service for managing donations with NotchPay integration
@@ -32,6 +33,7 @@ export class DonationsService {
     private readonly notchPayService: NotchPayService,
     private readonly fundsService: FundsService,
     private readonly notificationsService: NotificationsService,
+    private readonly beneficiariesService: BeneficiariesService,
   ) {}
 
   /**
@@ -78,6 +80,13 @@ export class DonationsService {
 
     const savedDonation = await this.donationRepository.save(donation);
 
+    // Get active beneficiary to receive the payment
+    const activeBeneficiary = await this.beneficiariesService.getActiveBeneficiary();
+
+    if (!activeBeneficiary) {
+      this.logger.warn('No active beneficiary configured. Payment will proceed without beneficiary assignment.');
+    }
+
     // Initialize payment with NotchPay
     try {
       const paymentInit = await this.notchPayService.initializePayment({
@@ -88,6 +97,7 @@ export class DonationsService {
         email: userEmail,
         phone: userPhone,
         callbackUrl: `${process.env.FRONTEND_URL || 'https://app.ifa.church'}/donations/callback`,
+        beneficiaryId: activeBeneficiary?.notchpayId,
       });
 
       // Update donation with transaction ID
@@ -95,12 +105,14 @@ export class DonationsService {
       savedDonation.paymentMetadata = {
         reference: paymentInit.reference,
         authorization_url: paymentInit.authorization_url,
+        beneficiaryId: activeBeneficiary?.notchpayId,
+        beneficiaryName: activeBeneficiary?.name,
       };
 
       await this.donationRepository.save(savedDonation);
 
       this.logger.log(
-        `Payment initialized for donation ${savedDonation.id}: ${paymentInit.transactionId}`,
+        `Payment initialized for donation ${savedDonation.id}: ${paymentInit.transactionId}${activeBeneficiary ? ` -> Beneficiary: ${activeBeneficiary.name} (${activeBeneficiary.notchpayId})` : ''}`,
       );
 
       return {

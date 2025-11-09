@@ -10,5 +10,5 @@ export class BeneficiaryResponseDto {
   country: string;
   status: 'active' | 'inactive';
   createdAt: Date;
-  isDefault?: boolean; // Flag to mark default account in our system
+  isActive?: boolean; // Flag to mark if this beneficiary is currently active to receive payments
 }
