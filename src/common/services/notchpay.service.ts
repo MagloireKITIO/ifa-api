@@ -73,6 +73,30 @@ export class NotchPayService {
     const config = await this.getConfig();
 
     try {
+      // Validate email format
+      const isValidEmail = (email: string | undefined): boolean => {
+        if (!email) return false;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+      };
+
+      // Generate email from phone if no valid email provided
+      let validEmail = params.email;
+      if (!isValidEmail(validEmail) && params.phone) {
+        // Remove + and spaces from phone to create email
+        const cleanPhone = params.phone.replace(/[\s+]/g, '');
+        validEmail = `${cleanPhone}@noemail.ifa.church`;
+        this.logger.log(
+          `No valid email provided, using generated email: ${validEmail}`,
+        );
+      } else if (!isValidEmail(validEmail)) {
+        // Fallback if no phone either
+        validEmail = `user-${Date.now()}@noemail.ifa.church`;
+        this.logger.warn(
+          `No valid email or phone, using fallback email: ${validEmail}`,
+        );
+      }
+
       const response = await fetch(`${this.NOTCHPAY_API_URL}/payments`, {
         method: 'POST',
         headers: {
@@ -86,7 +110,7 @@ export class NotchPayService {
           description: params.description,
           reference: params.reference,
           callback: params.callbackUrl,
-          email: params.email,
+          email: validEmail,
           phone: params.phone,
           // Use beneficiaryId if provided, otherwise fallback to config receivingAccountId
           ...(params.beneficiaryId
@@ -109,9 +133,32 @@ export class NotchPayService {
 
       const data = await response.json();
 
+      // Log the response to understand NotchPay's structure
+      this.logger.log(
+        `NotchPay payment initialized successfully: ${JSON.stringify(data)}`,
+      );
+
+      // Extract authorization URL from various possible fields
+      const authUrl =
+        data.authorization_url ||
+        data.payment_url ||
+        data.url ||
+        data.checkout_url ||
+        data.transaction?.authorization_url ||
+        data.transaction?.payment_url;
+
+      if (!authUrl) {
+        this.logger.error(
+          `No authorization URL found in NotchPay response: ${JSON.stringify(data)}`,
+        );
+        throw new BadRequestException(
+          'Failed to get payment URL from NotchPay',
+        );
+      }
+
       return {
-        authorization_url: data.authorization_url || data.payment_url,
-        reference: data.reference,
+        authorization_url: authUrl,
+        reference: data.reference || data.transaction?.reference,
         transactionId: data.transaction?.reference || data.reference,
       };
     } catch (error) {

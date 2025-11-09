@@ -115,6 +115,20 @@ export class DonationsService {
         `Payment initialized for donation ${savedDonation.id}: ${paymentInit.transactionId}${activeBeneficiary ? ` -> Beneficiary: ${activeBeneficiary.name} (${activeBeneficiary.notchpayId})` : ''}`,
       );
 
+      // Validate that we have a payment URL
+      if (!paymentInit.authorization_url) {
+        this.logger.error(
+          `Missing authorization_url in payment initialization response for donation ${savedDonation.id}`,
+        );
+        throw new BadRequestException(
+          'Failed to get payment URL. Please try again.',
+        );
+      }
+
+      this.logger.log(
+        `Payment URL for donation ${savedDonation.id}: ${paymentInit.authorization_url}`,
+      );
+
       return {
         donation: savedDonation,
         paymentUrl: paymentInit.authorization_url,
