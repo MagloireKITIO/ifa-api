@@ -26,6 +26,8 @@ import { Language } from '../common/enums';
 @Injectable()
 export class AuthUserService {
   private supabase: SupabaseClient;
+  // Rate limiting: Map<phoneNumber, { count: number, lastAttempt: Date }>
+  private otpAttempts = new Map<string, { count: number; lastAttempt: Date }>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -38,6 +40,9 @@ export class AuthUserService {
   ) {
     // Initialiser Supabase client - sera chargé depuis app_settings
     this.initializeSupabase();
+
+    // Nettoyer les anciennes tentatives toutes les heures
+    setInterval(() => this.cleanupOldAttempts(), 60 * 60 * 1000);
   }
 
   /**
@@ -121,8 +126,15 @@ export class AuthUserService {
     const refreshToken = this.generateRefreshToken(user);
 
     // Vérifier si le profil est complet
-    // Un utilisateur doit compléter son profil s'il est nouveau OU si les informations essentielles manquent
-    const needsProfileCompletion = isNewUser || !user.displayName || !user.city || !user.country;
+    // Un utilisateur doit compléter son profil s'il est nouveau OU si le displayName manque
+    const needsProfileCompletion = isNewUser || !user.displayName;
+
+    console.log('🔍 [googleAuth] Profile completion check:', {
+      isNewUser,
+      displayName: user.displayName,
+      email: user.email,
+      needsProfileCompletion,
+    });
 
     return {
       user,
@@ -134,12 +146,46 @@ export class AuthUserService {
 
   /**
    * Phone OTP - Send OTP
-   * Envoie un OTP par SMS via Supabase
+   * Envoie un OTP par SMS via Supabase avec rate limiting
    */
   async sendPhoneOtp(
     phoneSendOtpDto: PhoneSendOtpDto,
   ): Promise<{ message: string }> {
     const { phoneNumber } = phoneSendOtpDto;
+
+    // Vérifier le rate limiting
+    const now = new Date();
+    const attempt = this.otpAttempts.get(phoneNumber);
+
+    if (attempt) {
+      const timeSinceLastAttempt = now.getTime() - attempt.lastAttempt.getTime();
+      const minutesSinceLastAttempt = timeSinceLastAttempt / 1000 / 60;
+
+      // Délais progressifs: 1min, 2min, 5min, 10min
+      const requiredDelay = this.getRequiredDelay(attempt.count);
+
+      if (minutesSinceLastAttempt < requiredDelay) {
+        const remainingMinutes = Math.ceil(requiredDelay - minutesSinceLastAttempt);
+        const minuteText = remainingMinutes === 1 ? 'minute' : 'minutes';
+        throw new BadRequestException(
+          `Trop de tentatives. Veuillez attendre ${remainingMinutes} ${minuteText} avant de demander un nouveau code.`
+        );
+      }
+
+      // Réinitialiser le compteur après 1 heure
+      if (minutesSinceLastAttempt > 60) {
+        this.otpAttempts.set(phoneNumber, { count: 1, lastAttempt: now });
+      } else {
+        // Incrémenter le compteur
+        this.otpAttempts.set(phoneNumber, {
+          count: attempt.count + 1,
+          lastAttempt: now,
+        });
+      }
+    } else {
+      // Première tentative
+      this.otpAttempts.set(phoneNumber, { count: 1, lastAttempt: now });
+    }
 
     // Envoyer OTP via Supabase
     const { error } = await this.supabase.auth.signInWithOtp({
@@ -153,6 +199,36 @@ export class AuthUserService {
     return {
       message: 'OTP sent successfully',
     };
+  }
+
+  /**
+   * Calculer le délai requis selon le nombre de tentatives
+   */
+  private getRequiredDelay(attemptCount: number): number {
+    switch (attemptCount) {
+      case 1:
+        return 1; // 1 minute
+      case 2:
+        return 2; // 2 minutes
+      case 3:
+        return 5; // 5 minutes
+      default:
+        return 10; // 10 minutes
+    }
+  }
+
+  /**
+   * Nettoyer les tentatives de plus de 1 heure
+   */
+  private cleanupOldAttempts(): void {
+    const now = new Date();
+    for (const [phoneNumber, attempt] of this.otpAttempts.entries()) {
+      const hoursSinceLastAttempt =
+        (now.getTime() - attempt.lastAttempt.getTime()) / 1000 / 60 / 60;
+      if (hoursSinceLastAttempt > 1) {
+        this.otpAttempts.delete(phoneNumber);
+      }
+    }
   }
 
   /**
@@ -172,7 +248,16 @@ export class AuthUserService {
     });
 
     if (error || !data?.user) {
-      throw new UnauthorizedException('Invalid or expired OTP');
+      console.error('🔴 OTP verification failed:', error);
+
+      // Messages d'erreur plus clairs selon le type d'erreur
+      if (error?.message?.includes('expired')) {
+        throw new UnauthorizedException('Le code OTP a expiré. Veuillez demander un nouveau code.');
+      } else if (error?.message?.includes('invalid')) {
+        throw new UnauthorizedException('Le code OTP est invalide. Veuillez vérifier et réessayer.');
+      } else {
+        throw new UnauthorizedException('Code OTP invalide ou expiré. Veuillez demander un nouveau code.');
+      }
     }
 
     const supabaseUser = data.user;
@@ -214,9 +299,17 @@ export class AuthUserService {
     const refreshToken = this.generateRefreshToken(user);
 
     // Vérifier si le profil est complet
-    // Un utilisateur doit compléter son profil s'il est nouveau OU si les informations essentielles manquent
+    // Un utilisateur doit compléter son profil s'il est nouveau OU si le displayName manque
     // Pour phone auth, displayName = phoneNumber par défaut, donc on vérifie aussi ça
-    const needsProfileCompletion = isNewUser || !user.displayName || user.displayName === phoneNumber || !user.city || !user.country;
+    const needsProfileCompletion = isNewUser || !user.displayName || user.displayName === phoneNumber;
+
+    console.log('🔍 [verifyPhoneOtp] Profile completion check:', {
+      isNewUser,
+      displayName: user.displayName,
+      phoneNumber,
+      displayNameEqualsPhone: user.displayName === phoneNumber,
+      needsProfileCompletion,
+    });
 
     return {
       user,
@@ -285,9 +378,9 @@ export class AuthUserService {
 
   /**
    * Get Current User
-   * Récupérer le profil de l'utilisateur connecté
+   * Récupérer le profil de l'utilisateur connecté avec le statut de complétion
    */
-  async getMe(userId: string): Promise<User> {
+  async getMe(userId: string): Promise<{ user: User; needsProfileCompletion: boolean }> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['center'],
@@ -297,7 +390,30 @@ export class AuthUserService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    // Vérifier si le profil nécessite une complétion
+    const needsProfileCompletion = this.checkNeedsProfileCompletion(user);
+
+    return {
+      user,
+      needsProfileCompletion,
+    };
+  }
+
+  /**
+   * Vérifier si un utilisateur doit compléter son profil
+   */
+  private checkNeedsProfileCompletion(user: User): boolean {
+    // Pour Google: vérifier que displayName existe
+    if (user.email && !user.phoneNumber) {
+      return !user.displayName;
+    }
+
+    // Pour Phone: vérifier que displayName n'est pas le numéro de téléphone
+    if (user.phoneNumber) {
+      return !user.displayName || user.displayName === user.phoneNumber;
+    }
+
+    return false;
   }
 
   /**

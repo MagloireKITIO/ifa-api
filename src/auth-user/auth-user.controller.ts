@@ -184,18 +184,17 @@ export class AuthUserController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get current user profile',
-    description: 'Retrieve the profile of the currently authenticated user',
+    description: 'Retrieve the profile of the currently authenticated user with completion status',
   })
   @ApiResponse({
     status: 200,
     description: 'User profile retrieved successfully',
-    type: User,
   })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized',
   })
-  async getMe(@CurrentUser() user: User): Promise<User> {
+  async getMe(@CurrentUser() user: User): Promise<{ user: User; needsProfileCompletion: boolean }> {
     return this.authUserService.getMe(user.id);
   }
 

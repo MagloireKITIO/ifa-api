@@ -38,11 +38,12 @@ async function bootstrap() {
   // Get port from config
   const port = configService.get('port');
 
-  // Start server
-  await app.listen(port);
+  // Start server on all network interfaces (0.0.0.0)
+  await app.listen(port, '0.0.0.0');
 
   console.log(`
   🚀 Application IFA API is running on: http://localhost:${port}/${apiPrefix}
+  🌐 Network: http://192.168.6.119:${port}/${apiPrefix}
   📝 Environment: ${configService.get('nodeEnv')}
   🗄️  Database: ${configService.get('database.host')}:${configService.get('database.port')}
   `);
