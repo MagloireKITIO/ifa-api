@@ -24,6 +24,7 @@ import {
   UpdateCenterDto,
   RegisterFcmTokenDto,
   DeleteFcmTokenDto,
+  UpdateNotificationPreferencesDto,
   UserResponseDto,
 } from './dto';
 
@@ -225,5 +226,53 @@ export class UsersController {
     @Body() deleteFcmTokenDto: DeleteFcmTokenDto,
   ): Promise<{ message: string }> {
     return this.usersService.deleteFcmToken(userId, deleteFcmTokenDto);
+  }
+
+  /**
+   * GET /users/me/notification-preferences
+   * Récupérer les préférences de notifications de l'utilisateur
+   */
+  @Get('me/notification-preferences')
+  @UseGuards(JwtUserAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get notification preferences',
+    description: 'Retrieve notification preferences for the authenticated user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification preferences retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getNotificationPreferences(@CurrentUser('sub') userId: string) {
+    return this.usersService.getNotificationPreferences(userId);
+  }
+
+  /**
+   * PATCH /users/me/notification-preferences
+   * Mettre à jour les préférences de notifications
+   */
+  @Patch('me/notification-preferences')
+  @UseGuards(JwtUserAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update notification preferences',
+    description:
+      'Update notification preferences for the authenticated user (events, prayers, testimonies, donations, general)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification preferences updated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateNotificationPreferences(
+    @CurrentUser('sub') userId: string,
+    @Body() updateNotificationPreferencesDto: UpdateNotificationPreferencesDto,
+  ) {
+    return this.usersService.updateNotificationPreferences(
+      userId,
+      updateNotificationPreferencesDto,
+    );
   }
 }

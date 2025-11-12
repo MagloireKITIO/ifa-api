@@ -3,4 +3,5 @@ export * from './update-language.dto';
 export * from './update-center.dto';
 export * from './register-fcm-token.dto';
 export * from './delete-fcm-token.dto';
+export * from './update-notification-preferences.dto';
 export * from './user-response.dto';

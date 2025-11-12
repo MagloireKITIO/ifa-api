@@ -5,6 +5,7 @@ import { UsersController } from './users.controller';
 import { User } from '../entities/user.entity';
 import { FCMToken } from '../entities/fcm-token.entity';
 import { Center } from '../entities/center.entity';
+import { UserNotificationPreference } from '../entities/user-notification-preference.entity';
 import { AuthUserModule } from '../auth-user/auth-user.module';
 
 /**
@@ -20,7 +21,7 @@ import { AuthUserModule } from '../auth-user/auth-user.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, FCMToken, Center]),
+    TypeOrmModule.forFeature([User, FCMToken, Center, UserNotificationPreference]),
     AuthUserModule, // Pour utiliser les guards et strategies JWT
   ],
   providers: [UsersService],

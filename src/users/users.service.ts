@@ -9,12 +9,14 @@ import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { FCMToken } from '../entities/fcm-token.entity';
 import { Center } from '../entities/center.entity';
+import { UserNotificationPreference } from '../entities/user-notification-preference.entity';
 import {
   UpdateProfileDto,
   UpdateLanguageDto,
   UpdateCenterDto,
   RegisterFcmTokenDto,
   DeleteFcmTokenDto,
+  UpdateNotificationPreferencesDto,
   UserResponseDto,
 } from './dto';
 
@@ -33,6 +35,9 @@ export class UsersService {
 
     @InjectRepository(Center)
     private readonly centerRepository: Repository<Center>,
+
+    @InjectRepository(UserNotificationPreference)
+    private readonly notificationPreferenceRepository: Repository<UserNotificationPreference>,
   ) {}
 
   /**
@@ -259,6 +264,74 @@ export class UsersService {
     await this.fcmTokenRepository.save(token);
 
     return { message: 'Token FCM supprimé avec succès' };
+  }
+
+  /**
+   * Récupérer les préférences de notifications de l'utilisateur
+   * GET /users/me/notification-preferences
+   */
+  async getNotificationPreferences(
+    userId: string,
+  ): Promise<UserNotificationPreference> {
+    let preferences = await this.notificationPreferenceRepository.findOne({
+      where: { userId },
+    });
+
+    // Si l'utilisateur n'a pas encore de préférences, en créer une avec les valeurs par défaut
+    if (!preferences) {
+      preferences = this.notificationPreferenceRepository.create({
+        userId,
+        eventsEnabled: true,
+        prayersEnabled: true,
+        testimoniesEnabled: true,
+        donationsEnabled: true,
+        generalEnabled: true,
+      });
+      await this.notificationPreferenceRepository.save(preferences);
+    }
+
+    return preferences;
+  }
+
+  /**
+   * Mettre à jour les préférences de notifications
+   * PATCH /users/me/notification-preferences
+   */
+  async updateNotificationPreferences(
+    userId: string,
+    updateDto: UpdateNotificationPreferencesDto,
+  ): Promise<UserNotificationPreference> {
+    // Récupérer ou créer les préférences
+    let preferences = await this.notificationPreferenceRepository.findOne({
+      where: { userId },
+    });
+
+    if (!preferences) {
+      preferences = this.notificationPreferenceRepository.create({
+        userId,
+      });
+    }
+
+    // Mettre à jour uniquement les champs fournis
+    if (updateDto.eventsEnabled !== undefined) {
+      preferences.eventsEnabled = updateDto.eventsEnabled;
+    }
+    if (updateDto.prayersEnabled !== undefined) {
+      preferences.prayersEnabled = updateDto.prayersEnabled;
+    }
+    if (updateDto.testimoniesEnabled !== undefined) {
+      preferences.testimoniesEnabled = updateDto.testimoniesEnabled;
+    }
+    if (updateDto.donationsEnabled !== undefined) {
+      preferences.donationsEnabled = updateDto.donationsEnabled;
+    }
+    if (updateDto.generalEnabled !== undefined) {
+      preferences.generalEnabled = updateDto.generalEnabled;
+    }
+
+    await this.notificationPreferenceRepository.save(preferences);
+
+    return preferences;
   }
 
   /**

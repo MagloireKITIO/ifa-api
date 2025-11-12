@@ -12,4 +12,5 @@ export * from './prayer.entity';
 export * from './prayer-reaction.entity';
 export * from './testimony.entity';
 export * from './user.entity';
+export * from './user-notification-preference.entity';
 export * from './withdrawal.entity';
