@@ -8,9 +8,13 @@ import {
   IsUrl,
   MaxLength,
   ValidateIf,
+  ValidateNested,
+  IsArray,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventType } from '../../common/enums';
+import { EventScheduleDayDto } from './event-schedule.dto';
 
 /**
  * DTO for creating a new event
@@ -62,12 +66,28 @@ export class CreateEventDto {
   type: EventType;
 
   @ApiProperty({
-    description: 'Date and time when the event takes place',
+    description: 'Date and time when the event starts',
     example: '2025-12-25T18:00:00Z',
   })
   @IsDateString()
-  @IsNotEmpty()
-  eventDate: string;
+  @IsOptional()
+  startDate?: string;
+
+  @ApiProperty({
+    description: 'Date and time when the event ends',
+    example: '2025-12-25T21:00:00Z',
+  })
+  @IsDateString()
+  @IsOptional()
+  endDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Legacy field - Date and time when the event takes place (deprecated, use startDate/endDate)',
+    example: '2025-12-25T18:00:00Z',
+  })
+  @IsDateString()
+  @IsOptional()
+  eventDate?: string;
 
   @ApiPropertyOptional({
     description: 'Physical location of the event',
@@ -119,4 +139,33 @@ export class CreateEventDto {
   @IsOptional()
   @MaxLength(500)
   coverImage?: string;
+
+  @ApiPropertyOptional({
+    description: 'Detailed schedule for multi-day events (crusades, conferences)',
+    type: [EventScheduleDayDto],
+    example: [
+      {
+        id: 'day-1',
+        day: 1,
+        date: '2025-01-15',
+        titleFr: 'Journée de guérison',
+        titleEn: 'Healing day',
+        sessions: [
+          {
+            id: 'session-1',
+            titleFr: 'Adoration et louange',
+            titleEn: 'Worship and Praise',
+            startTime: '18:00',
+            endTime: '19:00',
+            type: 'worship',
+          },
+        ],
+      },
+    ],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EventScheduleDayDto)
+  @IsOptional()
+  schedule?: EventScheduleDayDto[];
 }

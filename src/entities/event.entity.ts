@@ -9,12 +9,15 @@ import {
   Index,
 } from 'typeorm';
 import { EventType, EventStatus } from '../common/enums';
+import type { EventSchedule } from '../common/types/event-schedule.types';
 import { Center } from './center.entity';
 import { Admin } from './admin.entity';
 
 @Entity('events')
 @Index(['type'])
 @Index(['status'])
+@Index(['startDate'])
+@Index(['endDate'])
 @Index(['eventDate'])
 @Index(['centerId'])
 export class Event {
@@ -58,7 +61,22 @@ export class Event {
 
   @Column({
     type: 'timestamptz',
-    comment: 'Date and time when the event takes place',
+    nullable: true,
+    comment: 'Date and time when the event starts',
+  })
+  startDate: Date;
+
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+    comment: 'Date and time when the event ends',
+  })
+  endDate: Date;
+
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+    comment: 'Legacy field - Date and time when the event takes place (deprecated, use startDate/endDate)',
   })
   eventDate: Date;
 
@@ -106,12 +124,37 @@ export class Event {
   coverImage: string;
 
   @Column({
+    type: 'jsonb',
+    nullable: true,
+    comment: 'Detailed schedule for multi-day events (crusades, conferences)',
+  })
+  schedule: EventSchedule;
+
+  @Column({
     type: 'enum',
     enum: EventStatus,
     default: EventStatus.UPCOMING,
-    comment: 'Current status of the event',
+    comment: 'Current status of the event (auto-calculated based on dates)',
   })
   status: EventStatus;
+
+  /**
+   * Calcule le statut dynamiquement en fonction des dates
+   * @returns Le statut actuel de l'événement
+   */
+  getComputedStatus(): EventStatus {
+    const now = new Date();
+
+    if (now < this.startDate) {
+      return EventStatus.UPCOMING;
+    }
+
+    if (now >= this.startDate && now <= this.endDate) {
+      return EventStatus.ONGOING;
+    }
+
+    return EventStatus.PAST;
+  }
 
   @Column({
     type: 'boolean',

@@ -25,7 +25,40 @@ export class EventsService {
     @InjectRepository(AdminActivityLog)
     private readonly activityLogRepository: Repository<AdminActivityLog>,
     private readonly notificationsService: NotificationsService,
-  ) {}
+  ) {
+    // Migrer les anciennes données au démarrage
+    this.migrateOldEvents();
+  }
+
+  /**
+   * Migrer les anciens événements qui utilisent eventDate vers startDate/endDate
+   */
+  private async migrateOldEvents(): Promise<void> {
+    try {
+      // Trouver tous les événements qui ont eventDate mais pas startDate
+      const oldEvents = await this.eventRepository
+        .createQueryBuilder('event')
+        .where('event.eventDate IS NOT NULL')
+        .andWhere('event.startDate IS NULL')
+        .getMany();
+
+      if (oldEvents.length > 0) {
+        this.logger.log(`Migrating ${oldEvents.length} old events to new date format...`);
+
+        for (const event of oldEvents) {
+          // startDate = eventDate
+          event.startDate = event.eventDate;
+          // endDate = eventDate + 3 heures (valeur par défaut raisonnable)
+          event.endDate = new Date(event.eventDate.getTime() + 3 * 60 * 60 * 1000);
+        }
+
+        await this.eventRepository.save(oldEvents);
+        this.logger.log(`Successfully migrated ${oldEvents.length} events`);
+      }
+    } catch (error) {
+      this.logger.error('Error migrating old events:', error);
+    }
+  }
 
   /**
    * Create a new event
@@ -40,21 +73,51 @@ export class EventsService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<Event> {
-    // Validate event date is in the future
-    const eventDate = new Date(createEventDto.eventDate);
-    if (eventDate < new Date()) {
-      throw new BadRequestException('Event date must be in the future');
+    // Support legacy eventDate field
+    let startDate: Date;
+    let endDate: Date;
+    let eventDate: Date;
+
+    if (createEventDto.startDate && createEventDto.endDate) {
+      // Nouveau format
+      startDate = new Date(createEventDto.startDate);
+      endDate = new Date(createEventDto.endDate);
+      eventDate = startDate;
+    } else if (createEventDto.eventDate) {
+      // Format legacy
+      eventDate = new Date(createEventDto.eventDate);
+      startDate = eventDate;
+      endDate = new Date(eventDate.getTime() + 3 * 60 * 60 * 1000); // +3h par défaut
+    } else {
+      throw new BadRequestException(
+        'Either startDate/endDate or eventDate must be provided',
+      );
+    }
+
+    if (startDate < new Date()) {
+      throw new BadRequestException('Event start date must be in the future');
+    }
+
+    if (endDate < startDate) {
+      throw new BadRequestException('Event end date must be after start date');
     }
 
     // Create event with automatic status determination
     const event = this.eventRepository.create({
       ...createEventDto,
+      startDate,
+      endDate,
+      eventDate, // Legacy field
       createdById: adminId,
-      status: EventStatus.UPCOMING,
+      status: EventStatus.UPCOMING, // Will be computed dynamically
       notificationSent: false,
     });
 
     const savedEvent = await this.eventRepository.save(event);
+
+    // Update status based on computed value
+    savedEvent.status = savedEvent.getComputedStatus();
+    await this.eventRepository.save(savedEvent);
 
     // Log activity
     await this.logActivity(
@@ -66,7 +129,8 @@ export class EventsService {
         titleFr: savedEvent.titleFr,
         titleEn: savedEvent.titleEn,
         type: savedEvent.type,
-        eventDate: savedEvent.eventDate,
+        startDate: savedEvent.startDate,
+        endDate: savedEvent.endDate,
       },
       ipAddress,
       userAgent,
@@ -114,16 +178,16 @@ export class EventsService {
     }
 
     if (queryDto.fromDate && queryDto.toDate) {
-      query.andWhere('event.eventDate BETWEEN :fromDate AND :toDate', {
+      query.andWhere('event.startDate BETWEEN :fromDate AND :toDate', {
         fromDate: queryDto.fromDate,
         toDate: queryDto.toDate,
       });
     } else if (queryDto.fromDate) {
-      query.andWhere('event.eventDate >= :fromDate', {
+      query.andWhere('event.startDate >= :fromDate', {
         fromDate: queryDto.fromDate,
       });
     } else if (queryDto.toDate) {
-      query.andWhere('event.eventDate <= :toDate', {
+      query.andWhere('event.startDate <= :toDate', {
         toDate: queryDto.toDate,
       });
     }
@@ -137,13 +201,24 @@ export class EventsService {
     }
 
     // Order by event date (upcoming first, then past)
-    query.orderBy('event.eventDate', 'DESC');
+    query.orderBy('event.startDate', 'DESC');
 
     const events = await query.getMany();
 
+    // Update status for all events based on current time
+    const eventsWithUpdatedStatus = events.map((event) => {
+      event.status = event.getComputedStatus();
+      return event;
+    });
+
+    // Persist updated statuses
+    if (eventsWithUpdatedStatus.length > 0) {
+      await this.eventRepository.save(eventsWithUpdatedStatus);
+    }
+
     // If language preference is specified, we can format the response accordingly
     // For now, return all fields and let the controller/client handle it
-    return events;
+    return eventsWithUpdatedStatus;
   }
 
   /**
@@ -159,6 +234,10 @@ export class EventsService {
     if (!event) {
       throw new NotFoundException(`Event with ID "${id}" not found`);
     }
+
+    // Update and persist status based on current time
+    event.status = event.getComputedStatus();
+    await this.eventRepository.save(event);
 
     return event;
   }
@@ -180,7 +259,19 @@ export class EventsService {
   ): Promise<Event> {
     const event = await this.findOne(id);
 
-    // If updating event date, validate it
+    // If updating dates, validate them
+    const startDate = updateEventDto.startDate
+      ? new Date(updateEventDto.startDate)
+      : event.startDate;
+    const endDate = updateEventDto.endDate
+      ? new Date(updateEventDto.endDate)
+      : event.endDate;
+
+    if (startDate && endDate && endDate < startDate) {
+      throw new BadRequestException('Event end date must be after start date');
+    }
+
+    // Legacy eventDate handling
     if (updateEventDto.eventDate) {
       const newEventDate = new Date(updateEventDto.eventDate);
       if (newEventDate < new Date() && event.status === EventStatus.UPCOMING) {
@@ -188,10 +279,24 @@ export class EventsService {
           'Cannot set event date in the past for upcoming events',
         );
       }
+      // Si eventDate est mis à jour mais pas startDate/endDate, les synchroniser
+      if (!updateEventDto.startDate) {
+        updateEventDto.startDate = updateEventDto.eventDate;
+      }
+      if (!updateEventDto.endDate) {
+        const eventDateObj = new Date(updateEventDto.eventDate);
+        updateEventDto.endDate = new Date(
+          eventDateObj.getTime() + 3 * 60 * 60 * 1000,
+        ).toISOString();
+      }
     }
 
     // Update event
     Object.assign(event, updateEventDto);
+
+    // Recompute status after update
+    event.status = event.getComputedStatus();
+
     const updatedEvent = await this.eventRepository.save(event);
 
     // Log activity
