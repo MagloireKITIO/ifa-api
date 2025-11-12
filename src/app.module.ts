@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import envConfig from './config/env.config';
@@ -21,6 +22,7 @@ import { NotificationTemplatesModule } from './notification-templates/notificati
 import { DashboardStatsModule } from './dashboard-stats/dashboard-stats.module';
 import { UsersModule } from './users/users.module';
 import { CentersModule } from './centers/centers.module';
+import { EventRemindersModule } from './event-reminders/event-reminders.module';
 
 @Module({
   imports: [
@@ -34,6 +36,9 @@ import { CentersModule } from './centers/centers.module';
 
     // TypeORM Module
     TypeOrmModule.forRootAsync(typeOrmAsyncConfig),
+
+    // Schedule Module (for cron jobs)
+    ScheduleModule.forRoot(),
 
     // Database Module (Seeding)
     DatabaseModule,
@@ -54,6 +59,7 @@ import { CentersModule } from './centers/centers.module';
     NotificationsModule,
     NotificationTemplatesModule,
     DashboardStatsModule,
+    EventRemindersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
