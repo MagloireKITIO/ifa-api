@@ -101,6 +101,26 @@ export class Testimony {
   })
   approvedById: string;
 
+  @Column({
+    type: 'jsonb',
+    nullable: true,
+    comment: 'AI moderation results and metadata',
+  })
+  aiModerationData: {
+    decision: string;
+    confidence: number;
+    reason: string;
+    categories: {
+      isAppropriate: boolean;
+      isRelevant: boolean;
+      isCoherent: boolean;
+      isSpam: boolean;
+      hasInappropriateContent: boolean;
+    };
+    analyzedAt: Date;
+    model: string;
+  };
+
   @ManyToOne(() => Admin, { nullable: true })
   @JoinColumn({ name: 'approvedById' })
   approvedBy: Admin;

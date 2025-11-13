@@ -8,6 +8,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -15,6 +16,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { PrayersService } from './prayers.service';
 import { JwtUserAuthGuard } from '../auth-user/guards';
@@ -25,6 +27,7 @@ import {
   AddTestimonyDto,
   PrayerPublicResponseDto,
   PrayerUserResponseDto,
+  QueryPublicPrayersDto,
 } from './dto';
 import { Prayer } from '../entities/prayer.entity';
 
@@ -74,6 +77,69 @@ export class PrayersUserController {
   ): Promise<PrayerPublicResponseDto> {
     const prayer = await this.prayersService.create(userId, createPrayerDto);
     return this.mapToPublicResponse(prayer);
+  }
+
+  /**
+   * GET /prayers/feed
+   * Récupère la liste des prières avec les réactions de l'utilisateur (USER AUTH)
+   */
+  @Get('feed')
+  @ApiOperation({
+    summary: 'Feed de prières avec réactions utilisateur',
+    description: 'Récupère la liste paginée des prières publiques avec les réactions de l\'utilisateur connecté',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['active', 'answered'],
+    description: 'Filtrer par statut',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Numéro de page (défaut: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Nombre d\'éléments par page (défaut: 20)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Liste paginée des prières avec réactions utilisateur',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Non authentifié',
+  })
+  async getFeedWithReactions(
+    @CurrentUser('sub') userId: string,
+    @Query() query: QueryPublicPrayersDto,
+  ): Promise<any> {
+    const result = await this.prayersService.findAllPublic(
+      query.page,
+      query.limit,
+      query.status,
+    );
+
+    // Récupérer les réactions utilisateur pour toutes les prières
+    const prayerIds = result.data.map(p => p.id);
+    const reactions = await this.prayersService.getUserReactionsBulk(prayerIds, userId);
+
+    // Mapper les prières avec les réactions
+    const dataWithReactions = result.data.map((prayer) => {
+      const reaction = reactions.find(r => r.prayerId === prayer.id);
+      const response = this.mapToPublicResponse(prayer) as PrayerUserResponseDto;
+      response.userReaction = reaction ? reaction.type : null;
+      return response;
+    });
+
+    return {
+      data: dataWithReactions,
+      meta: result.meta,
+    };
   }
 
   /**

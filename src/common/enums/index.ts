@@ -35,6 +35,8 @@ export enum TestimonyStatus {
   PENDING = 'pending',
   APPROVED = 'approved',
   REJECTED = 'rejected',
+  AUTO_APPROVED = 'auto_approved', // Automatically approved by AI
+  AUTO_REJECTED = 'auto_rejected', // Automatically rejected by AI
 }
 
 // Fund Type

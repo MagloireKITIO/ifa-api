@@ -17,6 +17,7 @@ import {
 } from './dto';
 import { TestimonyStatus } from '../common/enums';
 import { NotificationsService } from '../notifications/services/notifications.service';
+import { AiModerationService } from '../common/services/ai-moderation.service';
 
 /**
  * Service for managing testimonies with admin moderation
@@ -31,6 +32,7 @@ export class TestimoniesService {
     @InjectRepository(AdminActivityLog)
     private readonly activityLogRepository: Repository<AdminActivityLog>,
     private readonly notificationsService: NotificationsService,
+    private readonly aiModerationService: AiModerationService,
   ) {}
 
   /**
@@ -306,9 +308,11 @@ export class TestimoniesService {
     pending: number;
     approved: number;
     rejected: number;
+    autoApproved: number;
+    autoRejected: number;
     total: number;
   }> {
-    const [pending, approved, rejected, total] = await Promise.all([
+    const [pending, approved, rejected, autoApproved, autoRejected, total] = await Promise.all([
       this.testimonyRepository.count({
         where: { status: TestimonyStatus.PENDING },
       }),
@@ -318,10 +322,16 @@ export class TestimoniesService {
       this.testimonyRepository.count({
         where: { status: TestimonyStatus.REJECTED },
       }),
+      this.testimonyRepository.count({
+        where: { status: TestimonyStatus.AUTO_APPROVED },
+      }),
+      this.testimonyRepository.count({
+        where: { status: TestimonyStatus.AUTO_REJECTED },
+      }),
       this.testimonyRepository.count(),
     ]);
 
-    return { pending, approved, rejected, total };
+    return { pending, approved, rejected, autoApproved, autoRejected, total };
   }
 
   /**
@@ -336,7 +346,7 @@ export class TestimoniesService {
    *
    * LOGIQUE :
    * - Accessible sans authentification
-   * - Retourne uniquement les témoignages APPROVED
+   * - Retourne uniquement les témoignages APPROVED et AUTO_APPROVED
    * - Cache les infos user si isAnonymous = true
    * - Triés par date d'approbation (plus récents d'abord)
    */
@@ -351,7 +361,9 @@ export class TestimoniesService {
       .createQueryBuilder('testimony')
       .leftJoinAndSelect('testimony.user', 'user')
       .leftJoinAndSelect('testimony.prayer', 'prayer')
-      .where('testimony.status = :status', { status: TestimonyStatus.APPROVED })
+      .where('testimony.status IN (:...statuses)', {
+        statuses: [TestimonyStatus.APPROVED, TestimonyStatus.AUTO_APPROVED]
+      })
       .orderBy('testimony.approvedAt', 'DESC');
 
     // Pagination
@@ -386,7 +398,10 @@ export class TestimoniesService {
    */
   async findOnePublic(id: string): Promise<Testimony> {
     const testimony = await this.testimonyRepository.findOne({
-      where: { id, status: TestimonyStatus.APPROVED },
+      where: [
+        { id, status: TestimonyStatus.APPROVED },
+        { id, status: TestimonyStatus.AUTO_APPROVED }
+      ],
       relations: ['user', 'prayer'],
     });
 
@@ -408,13 +423,17 @@ export class TestimoniesService {
    *
    * LOGIQUE :
    * - L'utilisateur doit être authentifié
-   * - Créé avec status PENDING (en attente de modération)
-   * - L'admin devra l'approuver avant qu'il soit visible publiquement
+   * - Le témoignage est analysé automatiquement par l'IA
+   * - Selon la décision de l'IA :
+   *   * APPROVE → status AUTO_APPROVED (visible publiquement immédiatement)
+   *   * REJECT → status AUTO_REJECTED (non visible)
+   * - Les métadonnées de l'analyse IA sont stockées dans aiModerationData
+   * - L'admin peut consulter toutes les actions dans les logs
    */
   async create(
     userId: string,
     createTestimonyDto: CreateTestimonyDto,
-  ): Promise<any> {
+  ): Promise<Testimony> {
     // Validate: at least one content field must be provided
     if (!createTestimonyDto.contentFr && !createTestimonyDto.contentEn) {
       throw new BadRequestException(
@@ -422,6 +441,44 @@ export class TestimoniesService {
       );
     }
 
+    // Determine which content to analyze based on the language
+    const contentToAnalyze =
+      createTestimonyDto.language === 'fr'
+        ? (createTestimonyDto.contentFr || createTestimonyDto.contentEn || '')
+        : (createTestimonyDto.contentEn || createTestimonyDto.contentFr || '');
+
+    this.logger.log(`Starting AI moderation for new testimony (language: ${createTestimonyDto.language})`);
+
+    // Perform AI moderation
+    let moderationResult;
+    try {
+      moderationResult = await this.aiModerationService.moderateTestimony({
+        content: contentToAnalyze,
+        language: createTestimonyDto.language,
+      });
+
+      this.logger.log(
+        `AI Moderation Result: ${moderationResult.decision} (confidence: ${moderationResult.confidence}%)`,
+      );
+    } catch (error) {
+      this.logger.error('AI moderation failed, using fallback', error);
+      // If AI fails, default to PENDING for manual review
+      moderationResult = null;
+    }
+
+    // Determine status based on AI decision
+    let testimonyStatus: TestimonyStatus;
+    if (moderationResult) {
+      testimonyStatus =
+        moderationResult.decision === 'APPROVE'
+          ? TestimonyStatus.AUTO_APPROVED
+          : TestimonyStatus.AUTO_REJECTED;
+    } else {
+      // Fallback: PENDING if AI moderation failed
+      testimonyStatus = TestimonyStatus.PENDING;
+    }
+
+    // Create testimony with AI moderation data
     const testimony = this.testimonyRepository.create({
       userId: createTestimonyDto.isAnonymous ? null : userId,
       contentFr: createTestimonyDto.contentFr || null,
@@ -429,11 +486,44 @@ export class TestimoniesService {
       isAnonymous: createTestimonyDto.isAnonymous,
       prayerId: createTestimonyDto.prayerId || null,
       language: createTestimonyDto.language,
-      status: TestimonyStatus.PENDING,
+      status: testimonyStatus,
       submittedAt: new Date(),
+      approvedAt: testimonyStatus === TestimonyStatus.AUTO_APPROVED ? new Date() : null,
+      aiModerationData: moderationResult ? {
+        decision: moderationResult.decision,
+        confidence: moderationResult.confidence,
+        reason: moderationResult.reason,
+        categories: moderationResult.categories,
+        analyzedAt: moderationResult.analyzedAt,
+        model: moderationResult.model,
+      } : null,
     } as any);
 
-    return await this.testimonyRepository.save(testimony);
+    const savedTestimony: Testimony = await this.testimonyRepository.save(testimony) as unknown as Testimony;
+
+    // Send notification if auto-approved and not anonymous
+    if (
+      testimonyStatus === TestimonyStatus.AUTO_APPROVED &&
+      !createTestimonyDto.isAnonymous &&
+      userId
+    ) {
+      try {
+        await this.notificationsService.createTestimonyApprovedNotification(
+          userId,
+          savedTestimony.id,
+        );
+        this.logger.log(`Notification sent for auto-approved testimony: ${savedTestimony.id}`);
+      } catch (error) {
+        this.logger.error(`Failed to send notification for testimony ${savedTestimony.id}:`, error);
+        // Don't fail the creation if notification fails
+      }
+    }
+
+    this.logger.log(
+      `Testimony created with status: ${testimonyStatus} (ID: ${savedTestimony.id})`,
+    );
+
+    return savedTestimony;
   }
 
   /**

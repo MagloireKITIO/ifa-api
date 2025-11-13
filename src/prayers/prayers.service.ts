@@ -398,6 +398,26 @@ export class PrayersService {
   }
 
   /**
+   * Get user's reactions for multiple prayers (bulk)
+   * @param prayerIds - Array of Prayer IDs
+   * @param userId - User ID
+   */
+  async getUserReactionsBulk(
+    prayerIds: string[],
+    userId: string,
+  ): Promise<PrayerReaction[]> {
+    if (!prayerIds.length) {
+      return [];
+    }
+
+    return this.reactionRepository
+      .createQueryBuilder('reaction')
+      .where('reaction.userId = :userId', { userId })
+      .andWhere('reaction.prayerId IN (:...prayerIds)', { prayerIds })
+      .getMany();
+  }
+
+  /**
    * ============================================
    * PUBLIC & USER ENDPOINTS FOR MOBILE APP
    * ============================================
@@ -411,6 +431,19 @@ export class PrayersService {
    * - Accessible sans authentification
    * - Retourne uniquement les prières actives par défaut
    * - Cache les infos user si isAnonymous = true
+   * - TRI INTELLIGENT : Score basé sur engagement, fraîcheur et boost
+   *
+   * ALGORITHME DE FEED :
+   * Score = (Engagement × 0.4) + (Fraîcheur × 0.3) + (Boost × 0.3)
+   *
+   * - Engagement: (prayedCount × 2) + (fastedCount × 3)
+   *   Le jeûne a plus de poids car c'est un engagement plus fort
+   *
+   * - Fraîcheur: Points selon l'âge de la prière
+   *   < 1h: 100 pts | 1-6h: 90 pts | 6-24h: 70 pts | 1-3j: 50 pts
+   *   3-7j: 30 pts | 7-30j: 15 pts | > 30j: 5 pts
+   *
+   * - Boost: +100 pts si prière exaucée (témoignages prioritaires)
    */
   async findAllPublic(
     page: number = 1,
@@ -431,8 +464,35 @@ export class PrayersService {
       query.andWhere('prayer.status = :status', { status: PrayerStatus.ACTIVE });
     }
 
-    // Order by creation date (most recent first)
-    query.orderBy('prayer.createdAt', 'DESC');
+    // 🧠 ALGORITHME DE FEED INTELLIGENT (style Twitter/Instagram)
+    // Calcul du score de pertinence pour chaque prière
+    // Score = (Engagement × 0.4) + (Freshness × 0.3) + (Answered Boost × 0.3)
+
+    // On ajoute une colonne calculée "score" via addSelect
+    query.addSelect(
+      `
+        (
+          ((prayer.prayedCount * 2) + (prayer.fastedCount * 3)) * 0.4 +
+          (CASE
+            WHEN EXTRACT(EPOCH FROM (NOW() - prayer.createdAt)) < 3600 THEN 100
+            WHEN EXTRACT(EPOCH FROM (NOW() - prayer.createdAt)) < 21600 THEN 90
+            WHEN EXTRACT(EPOCH FROM (NOW() - prayer.createdAt)) < 86400 THEN 70
+            WHEN EXTRACT(EPOCH FROM (NOW() - prayer.createdAt)) < 259200 THEN 50
+            WHEN EXTRACT(EPOCH FROM (NOW() - prayer.createdAt)) < 604800 THEN 30
+            WHEN EXTRACT(EPOCH FROM (NOW() - prayer.createdAt)) < 2592000 THEN 15
+            ELSE 5
+          END) * 0.3 +
+          (CASE WHEN prayer.status = 'answered' THEN 100 ELSE 0 END) * 0.3
+        )
+      `,
+      'relevance_score'
+    );
+
+    // Tri par score décroissant (meilleurs scores en premier)
+    query.orderBy('relevance_score', 'DESC');
+
+    // Fallback : si deux prières ont le même score, la plus récente d'abord
+    query.addOrderBy('prayer.createdAt', 'DESC');
 
     // Pagination
     const skip = (page - 1) * limit;
