@@ -6,3 +6,4 @@ export * from './security-settings.dto';
 export * from './general-settings.dto';
 export * from './update-setting.dto';
 export * from './public-settings-response.dto';
+export * from './translate.dto';

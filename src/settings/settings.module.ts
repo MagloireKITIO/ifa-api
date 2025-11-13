@@ -4,7 +4,7 @@ import { SettingsController } from './settings.controller';
 import { BeneficiariesController } from './beneficiaries.controller';
 import { ConfigurationService, SettingsService } from './services';
 import { BeneficiariesService } from './services/beneficiaries.service';
-import { NotchPayService } from '../common/services';
+import { NotchPayService, AiTranslationService } from '../common/services';
 import { AppSettings } from '../entities/app-settings.entity';
 import { AdminActivityLog } from '../entities/admin-activity-log.entity';
 import { Beneficiary } from '../entities/beneficiary.entity';
@@ -19,7 +19,8 @@ import { Beneficiary } from '../entities/beneficiary.entity';
     SettingsService,
     BeneficiariesService,
     NotchPayService,
+    AiTranslationService,
   ],
-  exports: [ConfigurationService, SettingsService, BeneficiariesService], // Export for use in other modules
+  exports: [ConfigurationService, SettingsService, BeneficiariesService, AiTranslationService], // Export for use in other modules
 })
 export class SettingsModule {}

@@ -6,6 +6,7 @@ export enum AppSettingsCategory {
   I18N = 'i18n',
   SECURITY = 'security',
   GENERAL = 'general',
+  AI = 'ai',
 }
 
 // Admin Role

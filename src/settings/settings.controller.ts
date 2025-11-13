@@ -3,6 +3,7 @@ import {
   Get,
   Put,
   Delete,
+  Post,
   Body,
   Param,
   UseGuards,
@@ -19,16 +20,20 @@ import {
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { SettingsService } from './services';
-import { UpdateSettingDto, PublicSettingsResponseDto } from './dto';
+import { UpdateSettingDto, PublicSettingsResponseDto, TranslateTextDto, TranslateFieldsDto } from './dto';
 import { JwtAdminAuthGuard, PermissionsGuard } from '../auth-admin/guards';
 import { RequirePermissions, CurrentAdmin } from '../auth-admin/decorators';
 import { AdminPermission, AppSettingsCategory } from '../common/enums';
 import { Admin } from '../entities/admin.entity';
+import { AiTranslationService } from '../common/services';
 
 @ApiTags('Settings')
 @Controller('settings')
 export class SettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly settingsService: SettingsService,
+    private readonly aiTranslationService: AiTranslationService,
+  ) {}
 
   @Get('public')
   @ApiOperation({
@@ -222,5 +227,60 @@ export class SettingsController {
   async reloadCache() {
     await this.settingsService.reloadCache();
     return { message: 'Configuration cache reloaded successfully' };
+  }
+
+  @Post('translate')
+  @UseGuards(JwtAdminAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Translate text using AI',
+    description: 'Translate text from one language to another using OpenRouter AI.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Translation successful',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - translation failed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async translateText(@Body() dto: TranslateTextDto) {
+    return this.aiTranslationService.translateText(dto);
+  }
+
+  @Post('translate/fields')
+  @UseGuards(JwtAdminAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Translate multiple fields using AI',
+    description: 'Translate multiple text fields at once using OpenRouter AI.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Translation successful',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - translation failed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async translateFields(@Body() dto: TranslateFieldsDto) {
+    return this.aiTranslationService.translateFields(
+      dto.fields,
+      dto.fromLanguage,
+      dto.toLanguage,
+      dto.context,
+    );
+  }
+
+  @Get('ai/models')
+  @UseGuards(JwtAdminAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get available OpenRouter AI models',
+    description: 'Retrieve the list of available models from OpenRouter for translation.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Models retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getAvailableModels() {
+    return this.aiTranslationService.getAvailableModels();
   }
 }
