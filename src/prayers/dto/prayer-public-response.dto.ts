@@ -17,6 +17,12 @@ export class PrayerPublicResponseDto {
   })
   id: string;
 
+  @ApiProperty({
+    description: 'ID de l\'utilisateur qui a créé la prière',
+    example: '5074a457-9830-4bbc-8d1f-a0562fbcbed5',
+  })
+  userId: string;
+
   @ApiPropertyOptional({
     description: 'Contenu de la prière en français',
     example: 'Je demande vos prières pour ma guérison',

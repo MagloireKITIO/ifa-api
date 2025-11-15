@@ -92,10 +92,8 @@ export class TestimoniesPublicController {
       contentFr: testimony.contentFr,
       contentEn: testimony.contentEn,
       isAnonymous: testimony.isAnonymous,
-      status: testimony.status,
       language: testimony.language,
       submittedAt: testimony.submittedAt,
-      approvedAt: testimony.approvedAt,
       user: testimony.user && !testimony.isAnonymous
         ? {
             id: testimony.user.id,

@@ -86,8 +86,9 @@ export class AiModerationService {
               content: `Analyze this testimony:\n\n${content}`,
             },
           ],
-          temperature: 0.2, // Lower temperature for consistent moderation
-          max_tokens: 500,
+          temperature: 0.1, // Very low temperature for consistent, concise moderation
+          max_tokens: 200, // Limit tokens to force concise response
+          response_format: { type: 'json_object' }, // Force JSON output
         }),
       });
 
@@ -105,7 +106,10 @@ export class AiModerationService {
       const data = await response.json();
       this.logger.debug('OpenRouter API response:', JSON.stringify(data));
 
-      const aiResponse = data.choices?.[0]?.message?.content?.trim();
+      // Try to get response from content or reasoning fields
+      const aiResponse =
+        data.choices?.[0]?.message?.content?.trim() ||
+        data.choices?.[0]?.message?.reasoning?.trim();
 
       if (!aiResponse) {
         this.logger.error('No response from AI moderation', {
@@ -138,39 +142,25 @@ export class AiModerationService {
   private buildModerationPrompt(language: 'fr' | 'en'): string {
     const languageName = language === 'fr' ? 'French' : 'English';
 
-    return `You are a content moderator for a Christian church mobile application. Your role is to analyze testimonies submitted by users and determine if they should be approved or rejected.
+    return `Moderate this Christian testimony. Respond ONLY with valid JSON, no extra text.
 
-A testimony is a personal story about faith, answered prayers, spiritual experiences, or God's intervention in someone's life.
+Criteria: (1) Appropriate (2) Faith-related (3) Coherent (4) Not spam (5) Min 5 words
 
-Analyze the testimony based on these criteria:
-
-1. **Appropriate Content**: No hate speech, violence, sexual content, or offensive language
-2. **Relevant to Faith**: Related to Christian faith, prayer, spiritual experience, or testimony
-3. **Coherent**: Makes sense, is understandable, and properly written
-4. **Not Spam**: Not advertising, promotional content, or repetitive meaningless text
-5. **Sufficient Length**: At least 10 words
-
-Language: ${languageName}
-
-You MUST respond with a valid JSON object in this exact format:
+REQUIRED JSON format:
 {
   "decision": "APPROVE" or "REJECT",
-  "confidence": <number from 0 to 100>,
-  "reason": "<brief explanation in ${languageName}>",
+  "confidence": 0-100,
+  "reason": "brief ${languageName} explanation",
   "categories": {
-    "isAppropriate": <boolean>,
-    "isRelevant": <boolean>,
-    "isCoherent": <boolean>,
-    "isSpam": <boolean>,
-    "hasInappropriateContent": <boolean>
+    "isAppropriate": boolean,
+    "isRelevant": boolean,
+    "isCoherent": boolean,
+    "isSpam": boolean,
+    "hasInappropriateContent": boolean
   }
 }
 
-Decision Rules:
-- APPROVE: If the testimony meets all criteria (appropriate, relevant, coherent, not spam)
-- REJECT: If the testimony fails any critical criterion (inappropriate content, spam, incoherent, too short, not relevant)
-
-Be fair but firm. The goal is to maintain a positive, safe, and faith-focused environment.`;
+APPROVE if all criteria met. REJECT if any fails.`;
   }
 
   /**
@@ -224,7 +214,7 @@ Be fair but firm. The goal is to maintain a positive, safe, and faith-focused en
    */
   private createFallbackResult(content: string): ModerationResult {
     // Simple heuristic fallback
-    const isTooShort = content.trim().split(/\s+/).length < 10;
+    const isTooShort = content.trim().split(/\s+/).length < 5;
 
     return {
       decision: isTooShort ? 'REJECT' : 'APPROVE',

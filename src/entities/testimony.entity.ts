@@ -8,16 +8,13 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { TestimonyStatus, Language } from '../common/enums';
+import { Language } from '../common/enums';
 import { User } from './user.entity';
-import { Admin } from './admin.entity';
 import { Prayer } from './prayer.entity';
 
 @Entity('testimonies')
-@Index(['status'])
 @Index(['isAnonymous'])
 @Index(['submittedAt'])
-@Index(['approvedAt'])
 export class Testimony {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -67,14 +64,6 @@ export class Testimony {
 
   @Column({
     type: 'enum',
-    enum: TestimonyStatus,
-    default: TestimonyStatus.PENDING,
-    comment: 'Status of the testimony',
-  })
-  status: TestimonyStatus;
-
-  @Column({
-    type: 'enum',
     enum: Language,
     comment: 'Language in which the testimony was submitted',
   })
@@ -86,44 +75,6 @@ export class Testimony {
     comment: 'When the testimony was submitted',
   })
   submittedAt: Date;
-
-  @Column({
-    type: 'timestamptz',
-    nullable: true,
-    comment: 'When the testimony was approved',
-  })
-  approvedAt: Date;
-
-  @Column({
-    type: 'uuid',
-    nullable: true,
-    comment: 'ID of the admin who approved this testimony',
-  })
-  approvedById: string;
-
-  @Column({
-    type: 'jsonb',
-    nullable: true,
-    comment: 'AI moderation results and metadata',
-  })
-  aiModerationData: {
-    decision: string;
-    confidence: number;
-    reason: string;
-    categories: {
-      isAppropriate: boolean;
-      isRelevant: boolean;
-      isCoherent: boolean;
-      isSpam: boolean;
-      hasInappropriateContent: boolean;
-    };
-    analyzedAt: Date;
-    model: string;
-  };
-
-  @ManyToOne(() => Admin, { nullable: true })
-  @JoinColumn({ name: 'approvedById' })
-  approvedBy: Admin;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

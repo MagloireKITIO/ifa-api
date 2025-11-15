@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Param,
   Body,
@@ -23,6 +24,7 @@ import { JwtUserAuthGuard } from '../auth-user/guards';
 import { CurrentUser } from '../auth-user/decorators';
 import {
   CreatePrayerDto,
+  UpdatePrayerDto,
   ReactPrayerDto,
   AddTestimonyDto,
   PrayerPublicResponseDto,
@@ -352,11 +354,102 @@ export class PrayersUserController {
   }
 
   /**
+   * PATCH /user/prayers/:id
+   * Modifier une prière (USER AUTH - Style Twitter)
+   */
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Modifier une prière',
+    description: 'Permet au créateur de modifier sa prière (uniquement si elle est active)',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID de la prière',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Prière modifiée avec succès',
+    type: PrayerPublicResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Données invalides ou prière non active',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Non authentifié',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Seul l\'auteur peut modifier cette prière',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Prière non trouvée',
+  })
+  async update(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() updatePrayerDto: UpdatePrayerDto,
+  ): Promise<PrayerPublicResponseDto> {
+    const prayer = await this.prayersService.update(id, userId, updatePrayerDto);
+    return this.mapToPublicResponse(prayer);
+  }
+
+  /**
+   * DELETE /user/prayers/:id
+   * Supprimer une prière (USER AUTH - Style Twitter)
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Supprimer une prière',
+    description: 'Permet au créateur de supprimer sa prière',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID de la prière',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Prière supprimée avec succès',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Prayer deleted successfully' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Non authentifié',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Seul l\'auteur peut supprimer cette prière',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Prière non trouvée',
+  })
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+  ): Promise<{ message: string }> {
+    await this.prayersService.remove(id, userId);
+    return { message: 'Prayer deleted successfully' };
+  }
+
+  /**
    * Helper: Mapper Prayer entity vers PrayerPublicResponseDto
    */
   private mapToPublicResponse(prayer: Prayer): PrayerPublicResponseDto {
     return {
       id: prayer.id,
+      userId: prayer.userId,
       contentFr: prayer.contentFr,
       contentEn: prayer.contentEn,
       isAnonymous: prayer.isAnonymous,

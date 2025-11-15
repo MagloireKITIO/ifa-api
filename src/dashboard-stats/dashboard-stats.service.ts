@@ -8,7 +8,6 @@ import { Donation } from '../entities/donation.entity';
 import { AdminActivityLog } from '../entities/admin-activity-log.entity';
 import {
   EventStatus,
-  TestimonyStatus,
   PrayerStatus,
   DonationStatus,
 } from '../common/enums';
@@ -49,7 +48,7 @@ export class DashboardStatsService {
     // Execute all queries in parallel for better performance
     const [
       upcomingEventsCount,
-      pendingTestimoniesCount,
+      totalTestimoniesCount,
       activePrayersCount,
       totalDonationsThisMonth,
     ] = await Promise.all([
@@ -58,10 +57,8 @@ export class DashboardStatsService {
         where: { status: EventStatus.UPCOMING },
       }),
 
-      // Count pending testimonies
-      this.testimonyRepository.count({
-        where: { status: TestimonyStatus.PENDING },
-      }),
+      // Count total testimonies (no status filter since testimonies are published directly)
+      this.testimonyRepository.count(),
 
       // Count active prayers
       this.prayerRepository.count({
@@ -90,7 +87,7 @@ export class DashboardStatsService {
         upcoming: upcomingEventsCount,
       },
       testimonies: {
-        pending: pendingTestimoniesCount,
+        total: totalTestimoniesCount,
       },
       prayers: {
         active: activePrayersCount,

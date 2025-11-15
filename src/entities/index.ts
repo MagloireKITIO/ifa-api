@@ -4,7 +4,6 @@ export * from './app-settings.entity';
 export * from './center.entity';
 export * from './donation.entity';
 export * from './event.entity';
-export * from './event-reminder.entity';
 export * from './fcm-token.entity';
 export * from './fund.entity';
 export * from './notification.entity';

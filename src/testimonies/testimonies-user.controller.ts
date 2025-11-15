@@ -153,10 +153,8 @@ export class TestimoniesUserController {
       contentFr: testimony.contentFr,
       contentEn: testimony.contentEn,
       isAnonymous: testimony.isAnonymous,
-      status: testimony.status,
       language: testimony.language,
       submittedAt: testimony.submittedAt,
-      approvedAt: testimony.approvedAt,
       createdAt: testimony.createdAt,
       updatedAt: testimony.updatedAt,
     };

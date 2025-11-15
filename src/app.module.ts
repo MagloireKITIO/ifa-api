@@ -22,7 +22,6 @@ import { NotificationTemplatesModule } from './notification-templates/notificati
 import { DashboardStatsModule } from './dashboard-stats/dashboard-stats.module';
 import { UsersModule } from './users/users.module';
 import { CentersModule } from './centers/centers.module';
-import { EventRemindersModule } from './event-reminders/event-reminders.module';
 
 @Module({
   imports: [
@@ -59,7 +58,6 @@ import { EventRemindersModule } from './event-reminders/event-reminders.module';
     NotificationsModule,
     NotificationTemplatesModule,
     DashboardStatsModule,
-    EventRemindersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

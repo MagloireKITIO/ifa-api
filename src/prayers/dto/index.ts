@@ -2,6 +2,7 @@ export * from './query-prayers.dto';
 export * from './add-testimony.dto';
 export * from './react-prayer.dto';
 export * from './create-prayer.dto';
+export * from './update-prayer.dto';
 export * from './query-public-prayers.dto';
 export * from './prayer-public-response.dto';
 export * from './prayer-user-response.dto';

@@ -90,6 +90,7 @@ export class PrayersPublicController {
   private mapToPublicResponse(prayer: Prayer): PrayerPublicResponseDto {
     return {
       id: prayer.id,
+      userId: prayer.userId,
       contentFr: prayer.contentFr,
       contentEn: prayer.contentEn,
       isAnonymous: prayer.isAnonymous,

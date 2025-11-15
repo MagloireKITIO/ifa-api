@@ -1,5 +1,3 @@
-export * from './approve-testimony.dto';
-export * from './reject-testimony.dto';
 export * from './query-testimonies.dto';
 export * from './create-testimony.dto';
 export * from './query-public-testimonies.dto';

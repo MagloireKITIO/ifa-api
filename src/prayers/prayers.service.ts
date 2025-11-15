@@ -15,6 +15,7 @@ import {
   AddTestimonyDto,
   ReactPrayerDto,
   CreatePrayerDto,
+  UpdatePrayerDto,
 } from './dto';
 import { PrayerStatus, PrayerReactionType } from '../common/enums';
 import { NotificationsService } from '../notifications/services/notifications.service';
@@ -573,6 +574,52 @@ export class PrayersService {
       relations: ['user'],
       order: { createdAt: 'DESC' },
     });
+  }
+
+  /**
+   * Update a prayer (USER AUTH)
+   * PATCH /user/prayers/:id
+   *
+   * LOGIQUE :
+   * - Seul le créateur peut modifier sa prière
+   * - Modification possible uniquement si la prière est ACTIVE
+   * - Au moins un champ (contentFr ou contentEn) doit être fourni
+   */
+  async update(
+    id: string,
+    userId: string,
+    updatePrayerDto: UpdatePrayerDto,
+  ): Promise<Prayer> {
+    const prayer = await this.findOne(id);
+
+    // Check if user is the prayer author
+    if (prayer.userId !== userId) {
+      throw new ForbiddenException('You can only update your own prayers');
+    }
+
+    // Check if prayer is still active
+    if (prayer.status !== PrayerStatus.ACTIVE) {
+      throw new BadRequestException(
+        'You can only update prayers that are still active',
+      );
+    }
+
+    // Validate: at least one content field must be provided
+    if (!updatePrayerDto.contentFr && !updatePrayerDto.contentEn) {
+      throw new BadRequestException(
+        'At least one content field (contentFr or contentEn) must be provided',
+      );
+    }
+
+    // Update fields if provided
+    if (updatePrayerDto.contentFr !== undefined) {
+      prayer.contentFr = updatePrayerDto.contentFr;
+    }
+    if (updatePrayerDto.contentEn !== undefined) {
+      prayer.contentEn = updatePrayerDto.contentEn;
+    }
+
+    return await this.prayerRepository.save(prayer);
   }
 
   /**

@@ -6,22 +6,13 @@ import {
   IsString,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { TestimonyStatus, Language } from '../../common/enums';
+import { Language } from '../../common/enums';
 import { Transform } from 'class-transformer';
 
 /**
  * DTO for querying testimonies with filters
  */
 export class QueryTestimoniesDto {
-  @ApiPropertyOptional({
-    description: 'Filter by testimony status',
-    enum: TestimonyStatus,
-    example: TestimonyStatus.PENDING,
-  })
-  @IsEnum(TestimonyStatus)
-  @IsOptional()
-  status?: TestimonyStatus;
-
   @ApiPropertyOptional({
     description: 'Filter by anonymous testimonies',
     example: true,

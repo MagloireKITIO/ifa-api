@@ -16,15 +16,14 @@ import { SettingsModule } from '../settings/settings.module';
  * Module Testimonies pour la gestion des témoignages
  *
  * Fonctionnalités :
- * - Admin : Modération des témoignages (approve/reject) + Consultation des actions IA (TestimoniesController)
- * - Public : Liste des témoignages approuvés (TestimoniesPublicController)
- * - User : Soumettre, voir mes témoignages (TestimoniesUserController)
+ * - Admin : Consultation et suppression des témoignages (TestimoniesController)
+ * - Public : Liste des témoignages publics (TestimoniesPublicController)
+ * - User : Soumettre, voir et supprimer mes témoignages (TestimoniesUserController)
  *
  * Workflow :
- * 1. User soumet un témoignage → Analyse automatique par IA
- * 2. IA décide → AUTO_APPROVED (visible publiquement) ou AUTO_REJECTED (non visible)
- * 3. Admin peut consulter toutes les actions IA dans les logs
- * 4. Admin peut toujours approve/reject manuellement si nécessaire
+ * 1. User soumet un témoignage → Publié immédiatement sans validation
+ * 2. Si le témoignage est lié à une prière (prayerId), la prière est mise à jour avec le témoignage
+ * 3. Admin peut consulter et supprimer les témoignages
  */
 @Module({
   imports: [

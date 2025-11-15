@@ -30,14 +30,14 @@ export enum EventStatus {
   PAST = 'past',
 }
 
-// Testimony Status
-export enum TestimonyStatus {
-  PENDING = 'pending',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  AUTO_APPROVED = 'auto_approved', // Automatically approved by AI
-  AUTO_REJECTED = 'auto_rejected', // Automatically rejected by AI
-}
+// Testimony Status - Removed (testimonies are now published directly)
+// export enum TestimonyStatus {
+//   PENDING = 'pending',
+//   APPROVED = 'approved',
+//   REJECTED = 'rejected',
+//   AUTO_APPROVED = 'auto_approved',
+//   AUTO_REJECTED = 'auto_rejected',
+// }
 
 // Fund Type
 export enum FundType {

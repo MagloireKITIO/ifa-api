@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TestimonyStatus, Language } from '../../common/enums';
+import { Language } from '../../common/enums';
 
 /**
  * DTO de réponse pour un témoignage public
@@ -7,7 +7,7 @@ import { TestimonyStatus, Language } from '../../common/enums';
  * LOGIQUE :
  * - Contient les infos FR et EN
  * - Si isAnonymous = true, user sera null
- * - Uniquement les témoignages APPROVED sont exposés publiquement
+ * - Tous les témoignages sont publiés directement
  */
 export class TestimonyPublicResponseDto {
   @ApiProperty({
@@ -37,13 +37,6 @@ export class TestimonyPublicResponseDto {
   isAnonymous: boolean;
 
   @ApiProperty({
-    description: 'Statut du témoignage',
-    enum: TestimonyStatus,
-    example: TestimonyStatus.APPROVED,
-  })
-  status: TestimonyStatus;
-
-  @ApiProperty({
     description: 'Langue de soumission',
     enum: Language,
     example: Language.FR,
@@ -55,13 +48,6 @@ export class TestimonyPublicResponseDto {
     example: '2024-01-15T10:30:00Z',
   })
   submittedAt: Date;
-
-  @ApiPropertyOptional({
-    description: 'Date d\'approbation',
-    example: '2024-01-16T14:20:00Z',
-    nullable: true,
-  })
-  approvedAt: Date | null;
 
   @ApiPropertyOptional({
     description: 'Informations de l\'utilisateur (null si anonyme)',
