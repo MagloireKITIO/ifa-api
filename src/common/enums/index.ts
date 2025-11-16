@@ -88,6 +88,29 @@ export enum Language {
   EN = 'en',
 }
 
+// Verse Season/Theme
+export enum VerseSeason {
+  DEFAULT = 'default', // Year-round verses
+  CHRISTMAS = 'christmas', // Christmas period
+  EASTER = 'easter', // Easter period
+  PENTECOST = 'pentecost', // Pentecost period
+  NEW_YEAR = 'new_year', // New Year
+  LENT = 'lent', // Lent period
+  ADVENT = 'advent', // Advent period
+  THANKSGIVING = 'thanksgiving', // Thanksgiving
+  HOPE = 'hope', // Hope themed
+  FAITH = 'faith', // Faith themed
+  LOVE = 'love', // Love themed
+  HEALING = 'healing', // Healing themed
+  PROSPERITY = 'prosperity', // Prosperity themed
+}
+
+// Verse Source
+export enum VerseSource {
+  API = 'api', // From external Bible API
+  MANUAL = 'manual', // Manually added by admin
+}
+
 // Admin Permissions - Granular CRUD permissions for each module
 export enum AdminPermission {
   // Events permissions
@@ -128,6 +151,12 @@ export enum AdminPermission {
   CENTERS_CREATE = 'centers:create',
   CENTERS_UPDATE = 'centers:update',
   CENTERS_DELETE = 'centers:delete',
+
+  // Verses permissions
+  VERSES_READ = 'verses:read',
+  VERSES_CREATE = 'verses:create',
+  VERSES_UPDATE = 'verses:update',
+  VERSES_DELETE = 'verses:delete',
 
   // Admins permissions (only super-admin can manage admins)
   ADMINS_READ = 'admins:read',

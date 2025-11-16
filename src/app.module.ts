@@ -22,6 +22,7 @@ import { NotificationTemplatesModule } from './notification-templates/notificati
 import { DashboardStatsModule } from './dashboard-stats/dashboard-stats.module';
 import { UsersModule } from './users/users.module';
 import { CentersModule } from './centers/centers.module';
+import { VersesModule } from './verses/verses.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { CentersModule } from './centers/centers.module';
     WithdrawalsModule,
     PrayersModule,
     CentersModule, // Module Centers pour admin & mobile app
+    VersesModule, // Module Verses pour versets du jour (endpoint public, 100% automatique)
     NotificationsModule,
     NotificationTemplatesModule,
     DashboardStatsModule,
