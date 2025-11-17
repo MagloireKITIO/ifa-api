@@ -75,7 +75,7 @@ export class DonationsService {
       userId,
       status: DonationStatus.PENDING,
       currency: createDonationDto.currency || 'XAF',
-      paymentMethod: 'notchpay',
+      paymentMethod: createDonationDto.paymentMethod || 'mobile_money',
     });
 
     const savedDonation = await this.donationRepository.save(donation);
@@ -98,6 +98,7 @@ export class DonationsService {
         phone: userPhone,
         callbackUrl: `${process.env.FRONTEND_URL || 'https://app.ifa.church'}/donations/callback`,
         beneficiaryId: activeBeneficiary?.notchpayId,
+        paymentMethod: createDonationDto.paymentMethod || 'mobile_money',
       });
 
       // Update donation with transaction ID

@@ -14,6 +14,7 @@ import {
   UpdateFundStatusDto,
 } from './dto';
 import { FundType, FundStatus } from '../common/enums';
+import { PaymentLinkService } from '../common/services';
 
 /**
  * Service for managing funds (tithes, offerings, campaigns) with activity logging
@@ -25,6 +26,7 @@ export class FundsService {
     private readonly fundRepository: Repository<Fund>,
     @InjectRepository(AdminActivityLog)
     private readonly activityLogRepository: Repository<AdminActivityLog>,
+    private readonly paymentLinkService: PaymentLinkService,
   ) {}
 
   /**
@@ -66,9 +68,26 @@ export class FundsService {
       }
     }
 
+    // Generate slug if not provided
+    let slug = createFundDto.slug;
+    if (!slug) {
+      // Generate slug from titleEn + timestamp for uniqueness
+      const timestamp = Date.now().toString().slice(-6);
+      slug = this.paymentLinkService.generateSlug(createFundDto.titleEn, timestamp);
+    }
+
+    // Check if slug already exists
+    const existingFund = await this.fundRepository.findOne({ where: { slug } });
+    if (existingFund) {
+      // If slug exists, append random suffix
+      const randomSuffix = Math.random().toString(36).substring(2, 8);
+      slug = this.paymentLinkService.generateSlug(createFundDto.titleEn, randomSuffix);
+    }
+
     // Create fund
     const fund = this.fundRepository.create({
       ...createFundDto,
+      slug,
       createdById: adminId,
       status: FundStatus.ACTIVE,
       currentAmount: 0,

@@ -7,6 +7,7 @@ import {
   IsUUID,
   Min,
   MaxLength,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -42,6 +43,19 @@ export class CreateDonationDto {
   @IsOptional()
   @MaxLength(3)
   currency?: string;
+
+  @ApiPropertyOptional({
+    description: 'Payment method to use',
+    example: 'mobile_money',
+    default: 'mobile_money',
+    enum: ['mobile_money', 'card'],
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['mobile_money', 'card'], {
+    message: 'Payment method must be either mobile_money or card',
+  })
+  paymentMethod?: 'mobile_money' | 'card';
 
   @ApiPropertyOptional({
     description: 'Whether the donor wants to remain anonymous',

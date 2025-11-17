@@ -38,6 +38,16 @@ export class CreateFundDto {
   titleEn: string;
 
   @ApiPropertyOptional({
+    description: 'URL-friendly slug for payment links (auto-generated from titleEn if not provided)',
+    example: 'monthly-tithe-2025',
+    maxLength: 100,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  slug?: string;
+
+  @ApiPropertyOptional({
     description: 'Fund description in French',
     example: 'Soutenez l\'œuvre de Dieu par votre dîme mensuelle.',
   })

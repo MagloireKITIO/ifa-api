@@ -16,6 +16,7 @@ import { Admin } from './admin.entity';
 @Index(['status'])
 @Index(['startDate'])
 @Index(['endDate'])
+@Index(['slug'], { unique: true })
 export class Fund {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -33,6 +34,15 @@ export class Fund {
     comment: 'Fund title in English',
   })
   titleEn: string;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    unique: true,
+    nullable: true,
+    comment: 'URL-friendly slug for payment links',
+  })
+  slug: string;
 
   @Column({
     type: 'text',

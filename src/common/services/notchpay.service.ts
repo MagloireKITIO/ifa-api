@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigurationService } from '../../settings/services/configuration.service';
 import { CreateBeneficiaryDto, BeneficiaryResponseDto } from '../dto';
+import { GeneralSettingsDto } from '../../settings/dto/general-settings.dto';
 
 /**
  * Service for interacting with NotchPay API
@@ -55,6 +56,7 @@ export class NotchPayService {
    * @param callbackUrl - URL to redirect user after payment
    * @param email - User email (optional)
    * @param phone - User phone (optional)
+   * @param paymentMethod - Payment method to use (mobile_money or card)
    */
   async initializePayment(params: {
     amount: number;
@@ -65,6 +67,7 @@ export class NotchPayService {
     email?: string;
     phone?: string;
     beneficiaryId?: string; // NotchPay beneficiary ID to receive the payment
+    paymentMethod?: 'mobile_money' | 'card';
   }): Promise<{
     authorization_url: string;
     reference: string;
@@ -97,6 +100,58 @@ export class NotchPayService {
         );
       }
 
+      // Get general settings for theming
+      const generalSettings = await this.configService.get<GeneralSettingsDto>('general');
+
+      // Prepare payment payload
+      const paymentPayload: any = {
+        amount: params.amount,
+        currency: params.currency || 'XAF',
+        description: params.description,
+        reference: params.reference,
+        callback: params.callbackUrl,
+        email: validEmail,
+        phone: params.phone,
+      };
+
+      // Add theming if available
+      if (generalSettings) {
+        const theming: any = {};
+
+        if (generalSettings.primaryColor) {
+          theming.primary_color = generalSettings.primaryColor;
+        }
+
+        if (generalSettings.logoUrl) {
+          theming.logo_url = generalSettings.logoUrl;
+        }
+
+        // Only add theming if at least one property is set
+        if (Object.keys(theming).length > 0) {
+          paymentPayload.theming = theming;
+          this.logger.log(
+            `Applied theming: color=${theming.primary_color || 'default'}, logo=${theming.logo_url ? 'yes' : 'no'}`,
+          );
+        }
+      }
+
+      // Add locked_channel if payment method is specified
+      if (params.paymentMethod === 'mobile_money') {
+        paymentPayload.locked_channel = 'cm.mobile'; // Force mobile money only
+        this.logger.log('Locked channel to Mobile Money (cm.mobile)');
+      }
+
+      // Use beneficiaryId if provided, otherwise fallback to config receivingAccountId
+      if (params.beneficiaryId) {
+        paymentPayload.beneficiary = params.beneficiaryId;
+      } else if (config.receivingAccountId) {
+        paymentPayload.account_id = config.receivingAccountId;
+      }
+
+      this.logger.log(
+        `Initializing NotchPay payment${params.paymentMethod ? ` (preferred method: ${params.paymentMethod})` : ''}`,
+      );
+
       const response = await fetch(`${this.NOTCHPAY_API_URL}/payments`, {
         method: 'POST',
         headers: {
@@ -104,21 +159,7 @@ export class NotchPayService {
           Authorization: config.publicKey,
           'X-Public-Key': config.publicKey,
         },
-        body: JSON.stringify({
-          amount: params.amount,
-          currency: params.currency || 'XAF',
-          description: params.description,
-          reference: params.reference,
-          callback: params.callbackUrl,
-          email: validEmail,
-          phone: params.phone,
-          // Use beneficiaryId if provided, otherwise fallback to config receivingAccountId
-          ...(params.beneficiaryId
-            ? { beneficiary: params.beneficiaryId }
-            : config.receivingAccountId && {
-                account_id: config.receivingAccountId,
-              }),
-        }),
+        body: JSON.stringify(paymentPayload),
       });
 
       if (!response.ok) {

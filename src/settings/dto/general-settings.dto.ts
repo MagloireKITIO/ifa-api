@@ -68,6 +68,14 @@ export class GeneralSettingsDto {
   logoUrl?: string;
 
   @ApiPropertyOptional({
+    description: 'Primary color for branding (hex format)',
+    example: '#3B82F6',
+  })
+  @IsString()
+  @IsOptional()
+  primaryColor?: string;
+
+  @ApiPropertyOptional({
     description: 'Default timezone',
     example: 'Africa/Douala',
   })
