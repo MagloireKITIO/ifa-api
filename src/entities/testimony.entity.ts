@@ -44,23 +44,15 @@ export class Testimony {
   })
   prayerId: string;
 
-  @ManyToOne(() => Prayer, { nullable: true })
+  @ManyToOne(() => Prayer, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'prayerId' })
   prayer: Prayer;
 
   @Column({
     type: 'text',
-    nullable: true,
-    comment: 'Testimony content in French',
+    comment: 'Testimony content (user writes in their language)',
   })
-  contentFr: string;
-
-  @Column({
-    type: 'text',
-    nullable: true,
-    comment: 'Testimony content in English',
-  })
-  contentEn: string;
+  content: string;
 
   @Column({
     type: 'enum',

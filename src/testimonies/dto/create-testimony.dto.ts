@@ -7,28 +7,19 @@ import { Language } from '../../common/enums';
  * Endpoint: POST /testimonies
  *
  * LOGIQUE :
- * - L'utilisateur soumet son témoignage en FR ou EN
+ * - L'utilisateur soumet son témoignage dans SA langue
  * - Il peut choisir de rester anonyme
  * - Peut être lié à une prière exaucée (prayerId optionnel)
  * - Le témoignage est créé avec status PENDING
  * - L'admin devra l'approuver avant qu'il soit visible publiquement
  */
 export class CreateTestimonyDto {
-  @ApiPropertyOptional({
-    description: 'Contenu du témoignage en français',
+  @ApiProperty({
+    description: 'Contenu du témoignage (dans la langue de l\'utilisateur)',
     example: 'Dieu m\'a guéri d\'une maladie incurable ! Gloire à Lui !',
   })
-  @IsOptional()
   @IsString()
-  contentFr?: string;
-
-  @ApiPropertyOptional({
-    description: 'Contenu du témoignage en anglais',
-    example: 'God healed me from an incurable disease! Glory to Him!',
-  })
-  @IsOptional()
-  @IsString()
-  contentEn?: string;
+  content: string;
 
   @ApiProperty({
     description: 'Rester anonyme',

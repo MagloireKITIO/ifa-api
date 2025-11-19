@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { Prayer } from '../entities/prayer.entity';
 import { PrayerReaction } from '../entities/prayer-reaction.entity';
 import { AdminActivityLog } from '../entities/admin-activity-log.entity';
+import { Testimony } from '../entities/testimony.entity';
 import {
   QueryPrayersDto,
   AddTestimonyDto,
@@ -34,6 +35,8 @@ export class PrayersService {
     private readonly reactionRepository: Repository<PrayerReaction>,
     @InjectRepository(AdminActivityLog)
     private readonly activityLogRepository: Repository<AdminActivityLog>,
+    @InjectRepository(Testimony)
+    private readonly testimonyRepository: Repository<Testimony>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -78,10 +81,10 @@ export class PrayersService {
       });
     }
 
-    // Search in content (both languages)
+    // Search in content
     if (queryDto.search) {
       query.andWhere(
-        '(LOWER(prayer.contentFr) LIKE LOWER(:search) OR LOWER(prayer.contentEn) LIKE LOWER(:search))',
+        'LOWER(prayer.content) LIKE LOWER(:search)',
         { search: `%${queryDto.search}%` },
       );
     }
@@ -273,8 +276,7 @@ export class PrayersService {
     }
 
     // Update prayer
-    prayer.testimonyContentFr = testimonyDto.testimonyContentFr;
-    prayer.testimonyContentEn = testimonyDto.testimonyContentEn;
+    prayer.testimonyContent = testimonyDto.testimonyContent;
     prayer.testimoniedAt = new Date();
     prayer.status = PrayerStatus.ANSWERED;
 
@@ -329,13 +331,18 @@ export class PrayersService {
     adminId?: string,
     ipAddress?: string,
     userAgent?: string,
-  ): Promise<void> {
+  ): Promise<{ deletedTestimoniesCount: number }> {
     const prayer = await this.findOne(id);
 
     // Check if user is the prayer author or admin
     if (userId && prayer.userId !== userId && !adminId) {
       throw new ForbiddenException('You can only delete your own prayers');
     }
+
+    // Count linked testimonies that will be deleted via CASCADE
+    const linkedTestimoniesCount = await this.testimonyRepository.count({
+      where: { prayerId: id },
+    });
 
     // Log activity if deleted by admin
     if (adminId) {
@@ -349,6 +356,7 @@ export class PrayersService {
           isAnonymous: prayer.isAnonymous,
           status: prayer.status,
           language: prayer.language,
+          linkedTestimoniesCount,
         },
         ipAddress,
         userAgent,
@@ -356,6 +364,8 @@ export class PrayersService {
     }
 
     await this.prayerRepository.remove(prayer);
+
+    return { deletedTestimoniesCount: linkedTestimoniesCount };
   }
 
   /**
@@ -539,17 +549,9 @@ export class PrayersService {
    * - Compteurs initialisés à 0
    */
   async create(userId: string, createPrayerDto: CreatePrayerDto): Promise<any> {
-    // Validate: at least one content field must be provided
-    if (!createPrayerDto.contentFr && !createPrayerDto.contentEn) {
-      throw new BadRequestException(
-        'At least one content field (contentFr or contentEn) must be provided',
-      );
-    }
-
     const prayer = this.prayerRepository.create({
       userId,
-      contentFr: createPrayerDto.contentFr || null,
-      contentEn: createPrayerDto.contentEn || null,
+      content: createPrayerDto.content,
       isAnonymous: createPrayerDto.isAnonymous,
       language: createPrayerDto.language,
       status: PrayerStatus.ACTIVE,
@@ -604,19 +606,9 @@ export class PrayersService {
       );
     }
 
-    // Validate: at least one content field must be provided
-    if (!updatePrayerDto.contentFr && !updatePrayerDto.contentEn) {
-      throw new BadRequestException(
-        'At least one content field (contentFr or contentEn) must be provided',
-      );
-    }
-
-    // Update fields if provided
-    if (updatePrayerDto.contentFr !== undefined) {
-      prayer.contentFr = updatePrayerDto.contentFr;
-    }
-    if (updatePrayerDto.contentEn !== undefined) {
-      prayer.contentEn = updatePrayerDto.contentEn;
+    // Update content if provided
+    if (updatePrayerDto.content !== undefined) {
+      prayer.content = updatePrayerDto.content;
     }
 
     return await this.prayerRepository.save(prayer);

@@ -420,6 +420,7 @@ export class PrayersUserController {
       type: 'object',
       properties: {
         message: { type: 'string', example: 'Prayer deleted successfully' },
+        deletedTestimoniesCount: { type: 'number', example: 2, description: 'Number of linked testimonies that were also deleted' },
       },
     },
   })
@@ -438,9 +439,12 @@ export class PrayersUserController {
   async remove(
     @Param('id') id: string,
     @CurrentUser('sub') userId: string,
-  ): Promise<{ message: string }> {
-    await this.prayersService.remove(id, userId);
-    return { message: 'Prayer deleted successfully' };
+  ): Promise<{ message: string; deletedTestimoniesCount: number }> {
+    const result = await this.prayersService.remove(id, userId);
+    return {
+      message: 'Prayer deleted successfully',
+      deletedTestimoniesCount: result.deletedTestimoniesCount,
+    };
   }
 
   /**
@@ -450,14 +454,12 @@ export class PrayersUserController {
     return {
       id: prayer.id,
       userId: prayer.userId,
-      contentFr: prayer.contentFr,
-      contentEn: prayer.contentEn,
+      content: prayer.content,
       isAnonymous: prayer.isAnonymous,
       status: prayer.status,
       prayedCount: prayer.prayedCount,
       fastedCount: prayer.fastedCount,
-      testimonyContentFr: prayer.testimonyContentFr,
-      testimonyContentEn: prayer.testimonyContentEn,
+      testimonyContent: prayer.testimonyContent,
       testimoniedAt: prayer.testimoniedAt,
       language: prayer.language,
       user: prayer.user && !prayer.isAnonymous

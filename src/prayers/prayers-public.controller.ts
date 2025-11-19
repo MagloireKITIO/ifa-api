@@ -91,14 +91,12 @@ export class PrayersPublicController {
     return {
       id: prayer.id,
       userId: prayer.userId,
-      contentFr: prayer.contentFr,
-      contentEn: prayer.contentEn,
+      content: prayer.content,
       isAnonymous: prayer.isAnonymous,
       status: prayer.status,
       prayedCount: prayer.prayedCount,
       fastedCount: prayer.fastedCount,
-      testimonyContentFr: prayer.testimonyContentFr,
-      testimonyContentEn: prayer.testimonyContentEn,
+      testimonyContent: prayer.testimonyContent,
       testimoniedAt: prayer.testimoniedAt,
       language: prayer.language,
       user: prayer.user && !prayer.isAnonymous

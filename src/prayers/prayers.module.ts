@@ -7,6 +7,7 @@ import { PrayersService } from './prayers.service';
 import { Prayer } from '../entities/prayer.entity';
 import { PrayerReaction } from '../entities/prayer-reaction.entity';
 import { AdminActivityLog } from '../entities/admin-activity-log.entity';
+import { Testimony } from '../entities/testimony.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthUserModule } from '../auth-user/auth-user.module';
 
@@ -20,7 +21,7 @@ import { AuthUserModule } from '../auth-user/auth-user.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Prayer, PrayerReaction, AdminActivityLog]),
+    TypeOrmModule.forFeature([Prayer, PrayerReaction, AdminActivityLog, Testimony]),
     forwardRef(() => NotificationsModule), // For NotificationsService
     AuthUserModule, // Pour utiliser les guards et strategies JWT
   ],

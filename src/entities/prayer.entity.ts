@@ -32,17 +32,9 @@ export class Prayer {
 
   @Column({
     type: 'text',
-    nullable: true,
-    comment: 'Prayer content in French',
+    comment: 'Prayer content (user writes in their language)',
   })
-  contentFr: string;
-
-  @Column({
-    type: 'text',
-    nullable: true,
-    comment: 'Prayer content in English',
-  })
-  contentEn: string;
+  content: string;
 
   @Column({
     type: 'boolean',
@@ -76,16 +68,9 @@ export class Prayer {
   @Column({
     type: 'text',
     nullable: true,
-    comment: 'Testimony content in French (when prayer is answered)',
+    comment: 'Testimony content (when prayer is answered)',
   })
-  testimonyContentFr: string;
-
-  @Column({
-    type: 'text',
-    nullable: true,
-    comment: 'Testimony content in English (when prayer is answered)',
-  })
-  testimonyContentEn: string;
+  testimonyContent: string;
 
   @Column({
     type: 'timestamptz',

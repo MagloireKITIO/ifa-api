@@ -5,7 +5,7 @@ import { PrayerStatus, Language, PrayerReactionType } from '../../common/enums';
  * DTO de réponse pour une prière publique
  *
  * LOGIQUE :
- * - Contient les infos FR et EN
+ * - Contient le contenu dans la langue de soumission
  * - Si isAnonymous = true, user sera null
  * - Inclut les compteurs (prayedCount, fastedCount)
  * - Inclut le témoignage d'exaucement si présent
@@ -23,19 +23,11 @@ export class PrayerPublicResponseDto {
   })
   userId: string;
 
-  @ApiPropertyOptional({
-    description: 'Contenu de la prière en français',
+  @ApiProperty({
+    description: 'Contenu de la prière (dans la langue de l\'utilisateur)',
     example: 'Je demande vos prières pour ma guérison',
-    nullable: true,
   })
-  contentFr: string | null;
-
-  @ApiPropertyOptional({
-    description: 'Contenu de la prière en anglais',
-    example: 'I ask for your prayers for my healing',
-    nullable: true,
-  })
-  contentEn: string | null;
+  content: string;
 
   @ApiProperty({
     description: 'Si la prière est anonyme',
@@ -63,18 +55,11 @@ export class PrayerPublicResponseDto {
   fastedCount: number;
 
   @ApiPropertyOptional({
-    description: 'Témoignage d\'exaucement en français',
+    description: 'Témoignage d\'exaucement (dans la langue de l\'utilisateur)',
     example: 'Dieu m\'a guéri ! Gloire à Lui !',
     nullable: true,
   })
-  testimonyContentFr: string | null;
-
-  @ApiPropertyOptional({
-    description: 'Témoignage d\'exaucement en anglais',
-    example: 'God healed me! Glory to Him!',
-    nullable: true,
-  })
-  testimonyContentEn: string | null;
+  testimonyContent: string | null;
 
   @ApiPropertyOptional({
     description: 'Date du témoignage',

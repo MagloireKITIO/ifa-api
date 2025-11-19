@@ -89,8 +89,7 @@ export class TestimoniesPublicController {
   private mapToPublicResponse(testimony: Testimony): TestimonyPublicResponseDto {
     return {
       id: testimony.id,
-      contentFr: testimony.contentFr,
-      contentEn: testimony.contentEn,
+      content: testimony.content,
       isAnonymous: testimony.isAnonymous,
       language: testimony.language,
       submittedAt: testimony.submittedAt,

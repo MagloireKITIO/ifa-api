@@ -7,26 +7,17 @@ import { Language } from '../../common/enums';
  * Endpoint: POST /prayers
  *
  * LOGIQUE :
- * - L'utilisateur soumet sa demande de prière en FR ou EN
+ * - L'utilisateur soumet sa demande de prière dans SA langue
  * - Il peut choisir de rester anonyme
- * - La langue est automatiquement détectée selon le champ rempli
+ * - La langue est celle de son interface (FR ou EN)
  */
 export class CreatePrayerDto {
-  @ApiPropertyOptional({
-    description: 'Contenu de la prière en français',
+  @ApiProperty({
+    description: 'Contenu de la prière (dans la langue de l\'utilisateur)',
     example: 'Je demande vos prières pour ma guérison',
   })
-  @IsOptional()
   @IsString()
-  contentFr?: string;
-
-  @ApiPropertyOptional({
-    description: 'Contenu de la prière en anglais',
-    example: 'I ask for your prayers for my healing',
-  })
-  @IsOptional()
-  @IsString()
-  contentEn?: string;
+  content: string;
 
   @ApiProperty({
     description: 'Rester anonyme',

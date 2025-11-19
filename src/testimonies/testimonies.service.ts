@@ -70,10 +70,10 @@ export class TestimoniesService {
       });
     }
 
-    // Search in content (both languages)
+    // Search in content
     if (queryDto.search) {
       query.andWhere(
-        '(LOWER(testimony.contentFr) LIKE LOWER(:search) OR LOWER(testimony.contentEn) LIKE LOWER(:search))',
+        'LOWER(testimony.content) LIKE LOWER(:search)',
         { search: `%${queryDto.search}%` },
       );
     }
@@ -249,13 +249,6 @@ export class TestimoniesService {
     userId: string,
     createTestimonyDto: CreateTestimonyDto,
   ): Promise<Testimony> {
-    // Validate: at least one content field must be provided
-    if (!createTestimonyDto.contentFr && !createTestimonyDto.contentEn) {
-      throw new BadRequestException(
-        'At least one content field (contentFr or contentEn) must be provided',
-      );
-    }
-
     // Si le témoignage est lié à une prière, vérifier que la prière existe et appartient à l'utilisateur
     if (createTestimonyDto.prayerId) {
       const prayer = await this.prayerRepository.findOne({
@@ -271,12 +264,7 @@ export class TestimoniesService {
       }
 
       // Mettre à jour la prière avec le témoignage
-      if (createTestimonyDto.contentFr) {
-        prayer.testimonyContentFr = createTestimonyDto.contentFr;
-      }
-      if (createTestimonyDto.contentEn) {
-        prayer.testimonyContentEn = createTestimonyDto.contentEn;
-      }
+      prayer.testimonyContent = createTestimonyDto.content;
       prayer.testimoniedAt = new Date();
       prayer.status = PrayerStatus.ANSWERED;
 
@@ -289,20 +277,13 @@ export class TestimoniesService {
 
     // Create testimony entity
     const testimony = new Testimony();
+    testimony.content = createTestimonyDto.content;
     testimony.isAnonymous = createTestimonyDto.isAnonymous;
     testimony.language = createTestimonyDto.language;
     testimony.submittedAt = new Date();
 
     if (!createTestimonyDto.isAnonymous) {
       testimony.userId = userId;
-    }
-
-    if (createTestimonyDto.contentFr) {
-      testimony.contentFr = createTestimonyDto.contentFr;
-    }
-
-    if (createTestimonyDto.contentEn) {
-      testimony.contentEn = createTestimonyDto.contentEn;
     }
 
     if (createTestimonyDto.prayerId) {

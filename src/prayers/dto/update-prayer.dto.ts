@@ -6,24 +6,16 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
  * Endpoint: PATCH /user/prayers/:id
  *
  * LOGIQUE :
- * - L'utilisateur peut modifier le contenu de sa prière (FR ou EN)
+ * - L'utilisateur peut modifier le contenu de sa prière
  * - Seul le créateur de la prière peut la modifier
  * - La modification n'est possible que si la prière est en statut ACTIVE
  */
 export class UpdatePrayerDto {
   @ApiPropertyOptional({
-    description: 'Contenu de la prière en français (optionnel)',
+    description: 'Contenu de la prière (optionnel)',
     example: 'Je demande vos prières pour ma guérison complète',
   })
   @IsOptional()
   @IsString()
-  contentFr?: string;
-
-  @ApiPropertyOptional({
-    description: 'Contenu de la prière en anglais (optionnel)',
-    example: 'I ask for your prayers for my complete healing',
-  })
-  @IsOptional()
-  @IsString()
-  contentEn?: string;
+  content?: string;
 }

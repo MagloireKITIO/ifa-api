@@ -6,22 +6,12 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class AddTestimonyDto {
   @ApiProperty({
-    description: 'Testimony content in French',
+    description: 'Testimony content (user writes in their language)',
     example: 'Ma prière a été exaucée ! Dieu est fidèle.',
     maxLength: 2000,
   })
   @IsString()
   @IsNotEmpty()
   @MaxLength(2000)
-  testimonyContentFr: string;
-
-  @ApiProperty({
-    description: 'Testimony content in English',
-    example: 'My prayer has been answered! God is faithful.',
-    maxLength: 2000,
-  })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(2000)
-  testimonyContentEn: string;
+  testimonyContent: string;
 }
