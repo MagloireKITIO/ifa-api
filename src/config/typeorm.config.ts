@@ -7,14 +7,22 @@ export const typeOrmAsyncConfig: TypeOrmModuleAsyncOptions = {
   useFactory: async (configService: ConfigService): Promise<TypeOrmModuleOptions> => {
     const isProduction = configService.get('nodeEnv') === 'production';
     const sslEnabled = configService.get('database.ssl');
+    const databaseUrl = configService.get('database.url');
 
     return {
       type: 'postgres',
-      host: configService.get('database.host'),
-      port: configService.get('database.port'),
-      username: configService.get('database.username'),
-      password: configService.get('database.password'),
-      database: configService.get('database.database'),
+
+      // Si DATABASE_URL est définie, l'utiliser en priorité
+      ...(databaseUrl
+        ? { url: databaseUrl }
+        : {
+            host: configService.get('database.host'),
+            port: configService.get('database.port'),
+            username: configService.get('database.username'),
+            password: configService.get('database.password'),
+            database: configService.get('database.database'),
+          }),
+
       schema: configService.get('database.schema'),
 
       // SSL Configuration (pour Supabase en production)
