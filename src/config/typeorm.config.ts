@@ -7,23 +7,11 @@ export const typeOrmAsyncConfig: TypeOrmModuleAsyncOptions = {
   useFactory: async (configService: ConfigService): Promise<TypeOrmModuleOptions> => {
     const isProduction = configService.get('nodeEnv') === 'production';
     const sslEnabled = configService.get('database.ssl');
-    const databaseUrl = configService.get('database.url');
+    const databaseUrl = configService.get<string>('database.url');
 
-    return {
-      type: 'postgres',
-
-      // Si DATABASE_URL est définie, l'utiliser en priorité
-      ...(databaseUrl
-        ? { url: databaseUrl }
-        : {
-            host: configService.get('database.host'),
-            port: configService.get('database.port'),
-            username: configService.get('database.username'),
-            password: configService.get('database.password'),
-            database: configService.get('database.database'),
-          }),
-
-      schema: configService.get('database.schema'),
+    const baseConfig = {
+      type: 'postgres' as const,
+      schema: configService.get<string>('database.schema'),
 
       // SSL Configuration (pour Supabase en production)
       ssl: sslEnabled
@@ -58,5 +46,21 @@ export const typeOrmAsyncConfig: TypeOrmModuleAsyncOptions = {
         idleTimeoutMillis: 30000,
       },
     };
+
+    // Si DATABASE_URL est définie, l'utiliser en priorité
+    const connectionConfig = databaseUrl
+      ? { url: databaseUrl }
+      : {
+          host: configService.get<string>('database.host'),
+          port: configService.get<number>('database.port'),
+          username: configService.get<string>('database.username'),
+          password: configService.get<string>('database.password'),
+          database: configService.get<string>('database.database'),
+        };
+
+    return {
+      ...baseConfig,
+      ...connectionConfig,
+    } as TypeOrmModuleOptions;
   },
 };
