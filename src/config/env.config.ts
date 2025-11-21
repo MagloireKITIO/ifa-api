@@ -36,3 +36,4 @@ export default () => ({
     lastName: process.env.SUPER_ADMIN_LAST_NAME,
   },
 });
+
