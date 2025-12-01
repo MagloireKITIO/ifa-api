@@ -4,22 +4,38 @@ import { Language } from '../../common/enums';
 
 /**
  * DTO pour créer un témoignage (USER AUTH)
- * Endpoint: POST /testimonies
+ * Endpoint: POST /user/testimonies
  *
  * LOGIQUE :
- * - L'utilisateur soumet son témoignage dans SA langue
+ * - L'utilisateur soumet son témoignage dans SA langue (texte OU audio OU les deux)
  * - Il peut choisir de rester anonyme
  * - Peut être lié à une prière exaucée (prayerId optionnel)
- * - Le témoignage est créé avec status PENDING
- * - L'admin devra l'approuver avant qu'il soit visible publiquement
+ * - Si audio : upload d'abord via POST /user/testimonies/upload-audio
  */
 export class CreateTestimonyDto {
-  @ApiProperty({
-    description: 'Contenu du témoignage (dans la langue de l\'utilisateur)',
+  @ApiPropertyOptional({
+    description: 'Contenu du témoignage écrit (dans la langue de l\'utilisateur) - optionnel si audio fourni',
     example: 'Dieu m\'a guéri d\'une maladie incurable ! Gloire à Lui !',
   })
+  @IsOptional()
   @IsString()
-  content: string;
+  content?: string;
+
+  @ApiPropertyOptional({
+    description: 'URL de l\'audio uploadé (obtenu via /upload-audio) - optionnel si texte fourni',
+    example: 'https://xxx.supabase.co/storage/v1/object/public/ifa-testimonies/testimonies/abc.mp3',
+  })
+  @IsOptional()
+  @IsString()
+  audioUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Durée de l\'audio en secondes (max 300s = 5 min)',
+    example: 180,
+    type: Number,
+  })
+  @IsOptional()
+  audioDuration?: number | null;
 
   @ApiProperty({
     description: 'Rester anonyme',

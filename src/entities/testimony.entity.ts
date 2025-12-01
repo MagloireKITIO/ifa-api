@@ -50,9 +50,25 @@ export class Testimony {
 
   @Column({
     type: 'text',
-    comment: 'Testimony content (user writes in their language)',
+    nullable: true,
+    comment: 'Testimony content (user writes in their language) - null if audio only',
   })
-  content: string;
+  content: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+    comment: 'Audio file URL (stored in Supabase Storage)',
+  })
+  audioUrl: string | null;
+
+  @Column({
+    type: 'int',
+    nullable: true,
+    comment: 'Audio duration in seconds (max 300s = 5 min)',
+  })
+  audioDuration: number | null;
 
   @Column({
     type: 'enum',

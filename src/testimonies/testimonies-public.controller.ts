@@ -90,6 +90,8 @@ export class TestimoniesPublicController {
     return {
       id: testimony.id,
       content: testimony.content,
+      audioUrl: testimony.audioUrl,
+      audioDuration: testimony.audioDuration,
       isAnonymous: testimony.isAnonymous,
       language: testimony.language,
       submittedAt: testimony.submittedAt,

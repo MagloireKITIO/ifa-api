@@ -15,10 +15,12 @@ import {
   CreateTestimonyDto,
 } from './dto';
 import { PrayerStatus } from '../common/enums';
+import { StorageService } from '../common/services/storage.service';
 
 /**
  * Service for managing testimonies
  * Testimonies are now published directly without moderation
+ * Supports text, audio, or both
  */
 @Injectable()
 export class TestimoniesService {
@@ -31,6 +33,7 @@ export class TestimoniesService {
     private readonly activityLogRepository: Repository<AdminActivityLog>,
     @InjectRepository(Prayer)
     private readonly prayerRepository: Repository<Prayer>,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -237,18 +240,42 @@ export class TestimoniesService {
   }
 
   /**
+   * Upload audio file to Supabase Storage (USER AUTH)
+   * POST /user/testimonies/upload-audio
+   *
+   * LOGIQUE :
+   * - Upload le fichier audio vers Supabase Storage
+   * - Valide la durée (max 5 min) et la taille
+   * - Retourne l'URL publique du fichier
+   */
+  async uploadAudio(
+    file: Buffer,
+    mimetype: string,
+    duration?: number,
+  ): Promise<string> {
+    return this.storageService.uploadAudio(file, mimetype, duration);
+  }
+
+  /**
    * Create a new testimony (USER AUTH)
-   * POST /testimonies
+   * POST /user/testimonies
    *
    * LOGIQUE :
    * - L'utilisateur doit être authentifié
    * - Le témoignage est publié immédiatement sans validation
+   * - Peut contenir texte, audio, ou les deux
+   * - Au moins l'un des deux (content OU audioUrl) doit être fourni
    * - Si le témoignage est lié à une prière, met à jour la prière avec le témoignage
    */
   async create(
     userId: string,
     createTestimonyDto: CreateTestimonyDto,
   ): Promise<Testimony> {
+    // Valider qu'au moins content OU audioUrl est fourni
+    if (!createTestimonyDto.content && !createTestimonyDto.audioUrl) {
+      throw new BadRequestException('Either content or audioUrl must be provided');
+    }
+
     // Si le témoignage est lié à une prière, vérifier que la prière existe et appartient à l'utilisateur
     if (createTestimonyDto.prayerId) {
       const prayer = await this.prayerRepository.findOne({
@@ -263,21 +290,25 @@ export class TestimoniesService {
         throw new ForbiddenException('You can only add testimony to your own prayers');
       }
 
-      // Mettre à jour la prière avec le témoignage
-      prayer.testimonyContent = createTestimonyDto.content;
+      // Mettre à jour la prière avec le témoignage (texte uniquement pour l'instant)
+      if (createTestimonyDto.content) {
+        prayer.testimonyContent = createTestimonyDto.content;
+      }
       prayer.testimoniedAt = new Date();
       prayer.status = PrayerStatus.ANSWERED;
 
       await this.prayerRepository.save(prayer);
 
       this.logger.log(
-        `Prayer ${prayer.id} updated with testimony content and marked as answered`,
+        `Prayer ${prayer.id} updated with testimony and marked as answered`,
       );
     }
 
     // Create testimony entity
     const testimony = new Testimony();
-    testimony.content = createTestimonyDto.content;
+    testimony.content = createTestimonyDto.content ?? null;
+    testimony.audioUrl = createTestimonyDto.audioUrl ?? null;
+    testimony.audioDuration = createTestimonyDto.audioDuration ?? null;
     testimony.isAnonymous = createTestimonyDto.isAnonymous;
     testimony.language = createTestimonyDto.language;
     testimony.submittedAt = new Date();
@@ -293,7 +324,7 @@ export class TestimoniesService {
     const savedTestimony = await this.testimonyRepository.save(testimony);
 
     this.logger.log(
-      `Testimony created and published directly (ID: ${savedTestimony.id})`,
+      `Testimony created and published directly (ID: ${savedTestimony.id}, type: ${testimony.content ? 'text' : ''}${testimony.content && testimony.audioUrl ? '+' : ''}${testimony.audioUrl ? 'audio' : ''})`,
     );
 
     return savedTestimony;
@@ -316,10 +347,11 @@ export class TestimoniesService {
 
   /**
    * Delete my testimony (USER AUTH)
-   * DELETE /testimonies/:id
+   * DELETE /user/testimonies/:id
    *
    * LOGIQUE :
    * - L'utilisateur peut supprimer uniquement ses propres témoignages
+   * - Si le témoignage a un audio, il est aussi supprimé de Supabase Storage
    */
   async removeByUser(id: string, userId: string): Promise<void> {
     const testimony = await this.testimonyRepository.findOne({
@@ -335,7 +367,20 @@ export class TestimoniesService {
       throw new ForbiddenException('You can only delete your own testimonies');
     }
 
+    // Supprimer l'audio de Supabase Storage si présent
+    if (testimony.audioUrl) {
+      try {
+        await this.storageService.deleteAudio(testimony.audioUrl);
+        this.logger.log(`Deleted audio file for testimony ${id}`);
+      } catch (error) {
+        this.logger.error(`Failed to delete audio file for testimony ${id}:`, error);
+        // Continue avec la suppression du témoignage même si la suppression de l'audio échoue
+      }
+    }
+
     await this.testimonyRepository.remove(testimony);
+
+    this.logger.log(`Testimony ${id} deleted by user ${userId}`);
   }
 
   /**

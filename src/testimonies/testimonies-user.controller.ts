@@ -8,13 +8,19 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { TestimoniesService } from './testimonies.service';
 import { JwtUserAuthGuard } from '../auth-user/guards';
@@ -42,17 +48,81 @@ export class TestimoniesUserController {
   constructor(private readonly testimoniesService: TestimoniesService) {}
 
   /**
-   * POST /testimonies
+   * POST /user/testimonies/upload-audio
+   * Uploader un fichier audio pour témoignage (USER AUTH)
+   * Style WhatsApp : max 5 min, upload avant de créer le témoignage
+   */
+  @Post('upload-audio')
+  @UseInterceptors(FileInterceptor('audio'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Uploader un audio pour témoignage',
+    description: 'Upload un fichier audio (max 10MB, 5 min). Retourne l\'URL à utiliser dans CreateTestimonyDto.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        audio: {
+          type: 'string',
+          format: 'binary',
+        },
+        duration: {
+          type: 'number',
+          description: 'Durée en secondes (max 300)',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Audio uploadé avec succès',
+    schema: {
+      type: 'object',
+      properties: {
+        audioUrl: { type: 'string', example: 'https://xxx.supabase.co/storage/v1/object/public/ifa-testimonies/testimonies/abc.mp3' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Fichier invalide ou trop long',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Non authentifié',
+  })
+  async uploadAudio(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('duration') duration?: string,
+  ): Promise<{ audioUrl: string }> {
+    if (!file) {
+      throw new BadRequestException('No audio file provided');
+    }
+
+    const audioDuration = duration ? parseInt(duration, 10) : undefined;
+
+    const audioUrl = await this.testimoniesService.uploadAudio(
+      file.buffer,
+      file.mimetype,
+      audioDuration,
+    );
+
+    return { audioUrl };
+  }
+
+  /**
+   * POST /user/testimonies
    * Soumettre un témoignage (USER AUTH)
    */
   @Post()
   @ApiOperation({
     summary: 'Soumettre un témoignage',
-    description: 'Permet à un utilisateur connecté de soumettre un témoignage (sera en attente de modération)',
+    description: 'Permet à un utilisateur connecté de soumettre un témoignage (texte, audio, ou les deux)',
   })
   @ApiResponse({
     status: 201,
-    description: 'Témoignage soumis avec succès (en attente d\'approbation)',
+    description: 'Témoignage soumis avec succès',
     type: TestimonyUserResponseDto,
   })
   @ApiResponse({
@@ -151,6 +221,8 @@ export class TestimoniesUserController {
     return {
       id: testimony.id,
       content: testimony.content,
+      audioUrl: testimony.audioUrl,
+      audioDuration: testimony.audioDuration,
       isAnonymous: testimony.isAnonymous,
       language: testimony.language,
       submittedAt: testimony.submittedAt,

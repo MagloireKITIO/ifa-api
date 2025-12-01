@@ -16,11 +16,26 @@ export class TestimonyPublicResponseDto {
   })
   id: string;
 
-  @ApiProperty({
-    description: 'Contenu du témoignage (dans la langue de l\'utilisateur)',
+  @ApiPropertyOptional({
+    description: 'Contenu du témoignage écrit (dans la langue de l\'utilisateur) - optionnel si audio fourni',
     example: 'Dieu m\'a guéri d\'une maladie incurable ! Gloire à Lui !',
+    nullable: true,
   })
-  content: string;
+  content: string | null;
+
+  @ApiPropertyOptional({
+    description: 'URL de l\'audio du témoignage (stocké sur Supabase)',
+    example: 'https://xxx.supabase.co/storage/v1/object/public/ifa-testimonies/testimonies/abc.mp3',
+    nullable: true,
+  })
+  audioUrl: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Durée de l\'audio en secondes',
+    example: 180,
+    nullable: true,
+  })
+  audioDuration: number | null;
 
   @ApiProperty({
     description: 'Si le témoignage est anonyme',

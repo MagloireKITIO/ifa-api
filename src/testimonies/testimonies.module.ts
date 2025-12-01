@@ -10,6 +10,7 @@ import { AdminActivityLog } from '../entities/admin-activity-log.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthUserModule } from '../auth-user/auth-user.module';
 import { AiModerationService } from '../common/services/ai-moderation.service';
+import { StorageService } from '../common/services/storage.service';
 import { SettingsModule } from '../settings/settings.module';
 
 /**
@@ -37,7 +38,7 @@ import { SettingsModule } from '../settings/settings.module';
     TestimoniesPublicController, // Public endpoints for mobile app
     TestimoniesUserController, // User endpoints for mobile app (authenticated)
   ],
-  providers: [TestimoniesService, AiModerationService],
+  providers: [TestimoniesService, AiModerationService, StorageService],
   exports: [TestimoniesService], // Export for use in other modules (e.g., notifications)
 })
 export class TestimoniesModule {}
